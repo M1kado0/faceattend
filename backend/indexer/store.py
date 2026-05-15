@@ -5,7 +5,10 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import numpy as np
+from dotenv import load_dotenv
 import os
+
+load_dotenv()
 
 
 @dataclass

@@ -3,7 +3,15 @@ from fastapi import APIRouter, Depends, UploadFile
 
 from backend.api.dependencies import get_current_user
 from backend.api.schemas import EnrollResponse
+from backend.indexer.store import get_store
+import httpx
+from dotenv import load_dotenv
+import os
+import uuid
 
+load_dotenv()
+ml_service_url = os.getenv("ML_SERVICE_URL", "http://localhost:8003")
+index = get_store()
 router = APIRouter()
 
 
@@ -18,7 +26,22 @@ async def enroll(
     # 2. Detect + embed.
     # 3. Write to vector index via backend.indexer.
     # AUDIT: enroll.success | enroll.liveness_failed | enroll.no_face
-    raise NotImplementedError
+    async with httpx.AsyncClient() as client:
+        raw = await photo.read()
+        response = await client.post(
+            f"{ml_service_url}/v1/embed", files={"image": raw}
+        )
+        response.raise_for_status()
+        data = response.json()
+    embedding = data["embedding"]
+    image_id = str(uuid.uuid4())
+    await index.add(
+        image_id=image_id,
+        embedding=embedding,
+        metadata={"user_id": user.id}
+    )
+    return EnrollResponse(enrollment_id=image_id, embedding_model_version=data["model_version"])
+
 
 
 @router.get("/enrollments")
