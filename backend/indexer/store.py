@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import numpy as np
+import os
 
 
 @dataclass
@@ -39,4 +40,8 @@ class VectorStore(Protocol):
 
 def get_store() -> VectorStore:
     """Factory selecting the backend by VECTOR_DB_BACKEND env var."""
-    raise NotImplementedError
+    backend = os.environ.get("VECTOR_DB_BACKEND", "faiss")
+    if backend == "faiss":
+        from backend.indexer.faiss_store import FAISSStore
+        path = os.getenv("VECTOR_DB_INDEX_PATH", "./data/faiss.idx")
+        return FAISSStore(path)

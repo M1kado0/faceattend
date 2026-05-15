@@ -44,6 +44,7 @@ dependencies = [
     "onnxruntime>=1.26.0",
     "opencv-python>=4.13.0.92",
     "numpy>=2.4.4",
+    "faiss-cpu>=1.13.2",
 ]
 
 [project.optional-dependencies]

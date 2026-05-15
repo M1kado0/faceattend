@@ -1,10 +1,13 @@
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import cv2
 import numpy as np
 from insightface.app import FaceAnalysis
 import itertools
+from backend.indexer.store import get_store
+import asyncio
 
 def load_model() -> FaceAnalysis:
     app = FaceAnalysis(name="buffalo_l", providers=['CPUExecutionProvider'])
@@ -40,6 +43,18 @@ def main(image_dir: str) -> None:
     for combo in itertools.combinations(im2emb.keys(), 2):
         sim = cosine_similarity(im2emb[combo[0]], im2emb[combo[1]])
         print(f"Similarity between {combo[0]} and {combo[1]}: {sim}")
+    
+    index = get_store()
+    for img, emb in im2emb.items():
+        asyncio.run(index.add(image_id=img, embedding=emb, metadata={}))
+    
+    im = Path('images/1.jpg')
+    emb = get_face_embedding(app, im)
+    results = asyncio.run(index.search(embedding=emb, top_k=3))
+    for match in results:
+        print(match.image_id, match.score)
+
+
     
 
 
