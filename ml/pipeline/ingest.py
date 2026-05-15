@@ -17,4 +17,5 @@ class IngestResult:
 
 async def ingest_image(image_bytes: bytes, *, source_url: str) -> IngestResult | None:
     """Returns None if duplicate or no face found."""
+
     raise NotImplementedError

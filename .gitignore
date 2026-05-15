@@ -164,3 +164,6 @@ scratch/
 graphify-out
 docs
 tests
+.claudeignore
+
+images
