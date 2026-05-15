@@ -8,6 +8,7 @@ import httpx
 from dotenv import load_dotenv
 import os
 import uuid
+import numpy as np
 
 load_dotenv()
 ml_service_url = os.getenv("ML_SERVICE_URL", "http://localhost:8003")
@@ -16,12 +17,12 @@ index = get_store()
 router = APIRouter()
 
 
-@router.post("/search", response_model=SearchResponse)
+@router.post("/search")
 async def search(
     photo: UploadFile,
     liveness_blob: UploadFile,
     user=Depends(get_current_user),
-) -> SearchResponse:
+) -> list[dict]:
     # AUDIT: search.attempt
     # 1. Liveness check FIRST.
     # 2. Embed query face.
@@ -34,7 +35,14 @@ async def search(
         )
         response.raise_for_status()
         data = response.json()
-    embedding = data["embedding"]
+    embedding = np.array(data["embedding"], dtype=np.float32)
     matches = await index.search(embedding=embedding, top_k=10)
     query_id = str(uuid.uuid4())
-    return SearchResponse(query_id=query_id, matches=matches)
+
+    res = []
+    for match in matches:
+        res.append({
+            "match_id": match.image_id,
+            "score": float(match.score),
+        })
+    return res

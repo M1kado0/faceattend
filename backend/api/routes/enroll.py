@@ -8,6 +8,7 @@ import httpx
 from dotenv import load_dotenv
 import os
 import uuid
+import numpy as np
 
 load_dotenv()
 ml_service_url = os.getenv("ML_SERVICE_URL", "http://localhost:8003")
@@ -33,7 +34,7 @@ async def enroll(
         )
         response.raise_for_status()
         data = response.json()
-    embedding = data["embedding"]
+    embedding = np.array(data["embedding"], dtype=np.float32)
     image_id = str(uuid.uuid4())
     await index.add(
         image_id=image_id,

@@ -1,7 +1,9 @@
 """Async SQLAlchemy engine + session factory."""
 import os
-
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DATABASE_URI = os.getenv(
     "POSTGRES_URI",

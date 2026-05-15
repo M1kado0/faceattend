@@ -9,7 +9,7 @@ router = APIRouter()
 
 @router.get("/me", response_model=UserOut)
 async def get_me(user=Depends(get_current_user)) -> UserOut:
-    raise NotImplementedError
+    return user
 
 
 @router.patch("/me", response_model=UserOut)
