@@ -5,7 +5,12 @@ Schema (see backend/CLAUDE.md):
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Literal
+import uuid
+
+from backend.db.models.audit_log import AuditLog
+from backend.db.session import async_session
 
 ActorType = Literal["user", "admin", "system"]
 
@@ -21,4 +26,17 @@ async def log(
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> None:
-    raise NotImplementedError
+    entry = AuditLog(
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc),
+        actor_id=actor_id,
+        actor_type=actor_type,
+        action=action,
+        target_id=target_id,
+        metadata_json=metadata or {},
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    async with async_session() as session:
+        session.add(entry)
+        await session.commit()
