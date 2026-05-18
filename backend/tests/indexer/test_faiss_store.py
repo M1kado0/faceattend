@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from backend.indexer.faiss_store import FAISSStore
+from backend.indexer.store import clear_store_cache, get_store
 
 
 def _embedding(seed: int) -> np.ndarray:
@@ -73,3 +74,31 @@ async def test_faiss_store_rejects_zero_vector(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="Zero-norm embedding"):
         await store.add(embedding_id="bad", embedding=np.zeros(512, dtype=np.float32), metadata={})
+
+
+@pytest.mark.asyncio
+async def test_get_store_reuses_faiss_instance_for_same_path(monkeypatch, tmp_path) -> None:
+    clear_store_cache()
+    monkeypatch.setenv("VECTOR_DB_BACKEND", "faiss")
+    monkeypatch.setenv("VECTOR_DB_INDEX_PATH", str(tmp_path / "faces.idx"))
+
+    writer = get_store()
+    reader = get_store()
+
+    assert writer is reader
+
+    embedding = _embedding(10)
+    await writer.add(
+        embedding_id="shared-1",
+        embedding=embedding,
+        metadata={"embedding_model_version": "arcface-r100-v1"},
+    )
+
+    matches = await reader.search(
+        embedding=embedding,
+        top_k=1,
+        filter={"embedding_model_version": "arcface-r100-v1"},
+    )
+
+    assert [match.embedding_id for match in matches] == ["shared-1"]
+    clear_store_cache()

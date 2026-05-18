@@ -42,6 +42,9 @@ class VectorStore(Protocol):
     async def delete_by_user(self, *, user_id: str) -> int: ...
 
 
+_STORE_CACHE: dict[tuple[str, str], VectorStore] = {}
+
+
 def get_store() -> VectorStore:
     """Factory selecting the backend by VECTOR_DB_BACKEND env var."""
     backend = os.environ.get("VECTOR_DB_BACKEND", "faiss")
@@ -49,5 +52,13 @@ def get_store() -> VectorStore:
         from backend.indexer.faiss_store import FAISSStore
 
         path = os.getenv("VECTOR_DB_INDEX_PATH", "./data/faiss.idx")
-        return FAISSStore(path)
+        cache_key = (backend, path)
+        if cache_key not in _STORE_CACHE:
+            _STORE_CACHE[cache_key] = FAISSStore(path)
+        return _STORE_CACHE[cache_key]
     raise ValueError(f"Unsupported VECTOR_DB_BACKEND: {backend}")
+
+
+def clear_store_cache() -> None:
+    """Clear cached store instances for tests and one-off maintenance scripts."""
+    _STORE_CACHE.clear()
