@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Search | FaceGuard{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold">Search for matches</h1>
+        <p class="mt-2 text-base-content/70">
+            Upload a verified face photo to look for matching indexed images.
+        </p>
+    </div>
+
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <form
+                hx-post="/search"
+                hx-target="#search-result"
+                hx-swap="innerHTML"
+                hx-encoding="multipart/form-data"
+                class="space-y-6"
+            >
+                <div class="form-control">
+                    <label class="label" for="photo">
+                        <span class="label-text font-medium">Search photo</span>
+                    </label>
+                    <input
+                        id="photo"
+                        name="photo"
+                        type="file"
+                        accept="image/*"
+                        required
+                        class="file-input file-input-bordered w-full"
+                    >
+                </div>
+
+                <div class="form-control">
+                    <label class="label" for="liveness_blob">
+                        <span class="label-text font-medium">Liveness image</span>
+                    </label>
+                    <input
+                        id="liveness_blob"
+                        name="liveness_blob"
+                        type="file"
+                        accept="image/*"
+                        required
+                        class="file-input file-input-bordered w-full"
+                    >
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="btn btn-primary">
+                        Search
+                    </button>
+
+                    <span class="htmx-indicator loading loading-spinner loading-sm"></span>
+                </div>
+            </form>
+
+            <div id="search-result" class="mt-6"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

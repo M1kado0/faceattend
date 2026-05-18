@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Match Detail | FaceGuard{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold">Match detail</h1>
+        <p class="mt-2 break-all text-base-content/70">
+            {{ match_id }}
+        </p>
+    </div>
+
+    <div role="alert" class="alert">
+        <span>Detailed match pages will be available after match persistence is implemented.</span>
+    </div>
+</div>
+{% endblock %}

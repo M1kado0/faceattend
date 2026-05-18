@@ -1,14 +1,42 @@
 <div id="search-results">
     {% if not matches %}
-    <p class="text-center text-base-content/70">No matches yet. We'll keep monitoring.</p>
+    <div role="alert" class="alert">
+        <span>No matches found for this search.</span>
+    </div>
     {% else %}
-    <ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <ul class="grid grid-cols-1 gap-4 md:grid-cols-2">
         {% for match in matches %}
         <li class="card bg-base-100 shadow match-card">
             <div class="card-body">
-                <h3 class="card-title text-sm break-all">{{ match.source_page }}</h3>
-                <p class="text-xs">score: {{ "%.3f"|format(match.score) }}</p>
-                <a href="/matches/{{ match.match_id }}" class="btn btn-primary btn-sm">View</a>
+                <h3 class="card-title text-base">Potential match</h3>
+                <dl class="space-y-2 text-sm">
+                    <div>
+                        <dt class="font-medium text-base-content/70">Score</dt>
+                        <dd>{{ "%.3f"|format(match.score) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-base-content/70">Match ID</dt>
+                        <dd class="break-all">{{ match.match_id }}</dd>
+                    </div>
+                    {% if match.source_page %}
+                    <div>
+                        <dt class="font-medium text-base-content/70">Source page</dt>
+                        <dd class="break-all">{{ match.source_page }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+
+                <div class="card-actions justify-end">
+                    {% if match.source_url %}
+                    <a href="{{ match.source_url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">
+                        Open source
+                    </a>
+                    {% else %}
+                    <a href="/matches/{{ match.match_id }}" class="btn btn-sm">
+                        Details
+                    </a>
+                    {% endif %}
+                </div>
             </div>
         </li>
         {% endfor %}
