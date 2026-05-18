@@ -14,7 +14,7 @@ load_dotenv()
 
 @dataclass
 class Match:
-    image_id: str
+    embedding_id: str
     score: float
     metadata: dict
 
@@ -23,7 +23,7 @@ class VectorStore(Protocol):
     async def add(
         self,
         *,
-        image_id: str,
+        embedding_id: str,
         embedding: np.ndarray,
         metadata: dict,
     ) -> None: ...
@@ -36,7 +36,7 @@ class VectorStore(Protocol):
         filter: dict | None = None,  # noqa: A002
     ) -> list[Match]: ...
 
-    async def delete(self, *, image_id: str) -> None: ...
+    async def delete(self, *, embedding_id: str) -> None: ...
 
     # GDPR: right-to-erasure entrypoint. Returns count of deleted vectors.
     async def delete_by_user(self, *, user_id: str) -> int: ...

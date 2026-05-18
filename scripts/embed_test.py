@@ -53,13 +53,13 @@ def main(image_dir: str) -> None:
 
     index = get_store()
     for img, emb in im2emb.items():
-        asyncio.run(index.add(image_id=img, embedding=emb, metadata={}))
+        asyncio.run(index.add(embedding_id=img, embedding=emb, metadata={}))
 
     im = Path("images/1.jpg")
     emb = get_face_embedding(app, im)
     results = asyncio.run(index.search(embedding=emb, top_k=3))
     for match in results:
-        print(match.image_id, match.score)
+        print(match.embedding_id, match.score)
 
 
 if __name__ == "__main__":

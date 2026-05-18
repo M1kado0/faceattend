@@ -115,7 +115,7 @@ async def search(
         metadata = result_match.metadata
         matches.append(
             Match(
-                match_id=result_match.image_id,
+                match_id=result_match.embedding_id,
                 source_url=str(metadata.get("source_url", "")),
                 source_page=str(metadata.get("source_page", "")),
                 score=float(result_match.score),

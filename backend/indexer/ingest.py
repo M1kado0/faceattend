@@ -14,7 +14,7 @@ async def consume_one(message: dict) -> None:
     """
     store = get_store()
     await store.add(
-        image_id=message["image_id"],
+        embedding_id=message["embedding_id"],
         embedding=message["embedding"],
-        metadata={k: v for k, v in message.items() if k not in {"image_id", "embedding"}},
+        metadata={k: v for k, v in message.items() if k not in {"embedding_id", "embedding"}},
     )

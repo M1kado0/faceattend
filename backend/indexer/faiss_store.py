@@ -55,13 +55,13 @@ class FAISSStore(VectorStore):
             self._index.add(np.vstack(vectors).astype(np.float32))
         self._save()
 
-    async def add(self, *, image_id: str, embedding: np.ndarray, metadata: dict) -> None:
-        if image_id in self._metadata:
-            await self.delete(image_id=image_id)
+    async def add(self, *, embedding_id: str, embedding: np.ndarray, metadata: dict) -> None:
+        if embedding_id in self._metadata:
+            await self.delete(embedding_id=embedding_id)
         vec = self._normalize(embedding).reshape(1, _DIM)
         self._index.add(vec)
-        self._id_map.append(image_id)
-        self._metadata[image_id] = metadata
+        self._id_map.append(embedding_id)
+        self._metadata[embedding_id] = metadata
         self._save()
 
     async def search(
@@ -80,43 +80,47 @@ class FAISSStore(VectorStore):
         for score, index in zip(scores[0], indices[0], strict=True):
             if index == -1:
                 continue
-            image_id = self._id_map[index]
-            metadata = self._metadata[image_id]
+            embedding_id = self._id_map[index]
+            metadata = self._metadata[embedding_id]
             if not self._matches_filter(metadata, filter):
                 continue
-            results.append(Match(image_id=image_id, score=float(score), metadata=metadata))
+            results.append(Match(embedding_id=embedding_id, score=float(score), metadata=metadata))
             if len(results) == top_k:
                 break
         return results
 
-    async def delete(self, *, image_id: str) -> None:
-        if image_id not in self._metadata:
+    async def delete(self, *, embedding_id: str) -> None:
+        if embedding_id not in self._metadata:
             return
-        kept_ids = [existing_id for existing_id in self._id_map if existing_id != image_id]
+        kept_ids = [existing_id for existing_id in self._id_map if existing_id != embedding_id]
         vectors = [
             self._index.reconstruct(index)
             for index, existing_id in enumerate(self._id_map)
-            if existing_id != image_id
+            if existing_id != embedding_id
         ]
-        del self._metadata[image_id]
+        del self._metadata[embedding_id]
         self._rebuild(kept_ids, vectors)
 
     async def delete_by_user(self, *, user_id: str) -> int:
         ids_to_delete = {
-            image_id
-            for image_id, metadata in self._metadata.items()
+            embedding_id
+            for embedding_id, metadata in self._metadata.items()
             if metadata.get("user_id") == user_id
         }
         if not ids_to_delete:
             return 0
 
-        kept_ids = [image_id for image_id in self._id_map if image_id not in ids_to_delete]
+        kept_ids = [
+            embedding_id
+            for embedding_id in self._id_map
+            if embedding_id not in ids_to_delete
+        ]
         vectors = [
             self._index.reconstruct(index)
-            for index, image_id in enumerate(self._id_map)
-            if image_id not in ids_to_delete
+            for index, embedding_id in enumerate(self._id_map)
+            if embedding_id not in ids_to_delete
         ]
-        for image_id in ids_to_delete:
-            del self._metadata[image_id]
+        for embedding_id in ids_to_delete:
+            del self._metadata[embedding_id]
         self._rebuild(kept_ids, vectors)
         return len(ids_to_delete)
