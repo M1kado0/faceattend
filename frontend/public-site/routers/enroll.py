@@ -52,9 +52,9 @@ async def enroll(request: Request, photo: UploadFile, liveness_blob: UploadFile)
             liveness_blob=liveness_bytes,
             token=token,
             photo_filename=photo.filename or "photo.jpg",
-            photo_content_type=photo.content_type or "image/jpeg",
+            photo_content_type=photo.content_type or "application/octet-stream",
             liveness_filename=liveness_blob.filename or "liveness.jpg",
-            liveness_content_type=liveness_blob.content_type or "image/jpeg",
+            liveness_content_type=liveness_blob.content_type or "application/octet-stream",
         )
         return templates.TemplateResponse(
             request=request,
