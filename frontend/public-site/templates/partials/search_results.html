@@ -10,6 +10,13 @@
             <div class="card-body">
                 <h3 class="card-title text-base">Potential match</h3>
                 <dl class="space-y-2 text-sm">
+                    {% if match.image_thumbnail_url %}
+                    <img
+                        src="{{ match.image_thumbnail_url }}"
+                        alt="Matched image preview"
+                        class="h-48 w-full rounded object-cover"
+                    >
+                    {% endif %}
                     <div>
                         <dt class="font-medium text-base-content/70">Score</dt>
                         <dd>{{ "%.3f"|format(match.score) }}</dd>
@@ -22,6 +29,12 @@
                     <div>
                         <dt class="font-medium text-base-content/70">Source page</dt>
                         <dd class="break-all">{{ match.source_page }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if match.crawled_at %}
+                    <div>
+                        <dt class="font-medium text-base-content/70">Crawled at</dt>
+                        <dd class="break-all">{{ match.crawled_at }}</dd>
                     </div>
                     {% endif %}
                 </dl>
