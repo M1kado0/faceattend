@@ -309,11 +309,18 @@ async def test_search_filters_by_embedding_model_after_liveness(monkeypatch, use
     monkeypatch.setattr(search_module, "embed_image", fake_embed)
     monkeypatch.setattr(search_module, "index", index)
 
+    session = FakeSession()
     response = await search_module.search(
         photo=_upload("photo.jpg"),
         liveness_blob=_upload("live.jpg"),
         user=user,
+        session=session,
     )
 
-    assert response.matches[0].match_id == "match-1"
+    assert len(session.added) == 1
+    match_row = session.added[0]
+    assert response.matches[0].match_id == match_row.id
+    assert match_row.user_id == user.id
+    assert match_row.image_id == "match-1"
+    assert session.commit_count == 1
     assert index.searched[0][2] == {"embedding_model_version": "arcface-r100-v1"}

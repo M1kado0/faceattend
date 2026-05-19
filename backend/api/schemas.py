@@ -51,6 +51,7 @@ class Match(BaseModel):
     source_page: str
     score: float
     crawled_at: datetime
+    created_at: datetime
     image_thumbnail_url: str | None = None
 
 
