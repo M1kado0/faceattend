@@ -58,6 +58,42 @@ class FakeSearchClient:
         ]
 
 
+@dataclass
+class FakeMatchesClient:
+    list_result: list[dict] | None = None
+    detail_result: dict | None = None
+    list_error: Exception | None = None
+    detail_error: Exception | None = None
+
+    async def list_matches(self, **kwargs) -> list[dict]:
+        if self.list_error is not None:
+            raise self.list_error
+        return self.list_result or [
+            {
+                "match_id": "match-1",
+                "source_url": "https://example.test/image.jpg",
+                "source_page": "https://example.test/page",
+                "score": 0.91,
+                "crawled_at": "2026-05-18T00:00:00Z",
+                "created_at": "2026-05-18T00:00:00Z",
+                "image_thumbnail_url": None,
+            }
+        ]
+
+    async def get_match(self, **kwargs) -> dict:
+        if self.detail_error is not None:
+            raise self.detail_error
+        return self.detail_result or {
+            "match_id": "match-1",
+            "source_url": "https://example.test/image.jpg",
+            "source_page": "https://example.test/page",
+            "score": 0.91,
+            "crawled_at": "2026-05-18T00:00:00Z",
+            "created_at": "2026-05-18T00:00:00Z",
+            "image_thumbnail_url": None,
+        }
+
+
 def test_enroll_without_session_returns_login_required(client) -> None:
     response = client.post("/enroll", files=_files())
 
@@ -139,3 +175,82 @@ def test_successful_search_returns_results_partial(client, monkeypatch) -> None:
     assert response.status_code == 200
     assert "Potential match" in response.text
     assert "match-1" in response.text
+
+
+def test_matches_list_without_session_returns_login_required(client) -> None:
+    response = client.get("/matches")
+
+    assert response.status_code == 200
+    assert "Login required" in response.text
+
+
+def test_successful_matches_list_returns_matches_page(client, monkeypatch) -> None:
+    matches_module = pytest.importorskip("routers.matches")
+    monkeypatch.setattr(matches_module, "backend_client", FakeMatchesClient())
+    client.cookies.set("session_token", "token")
+
+    response = client.get("/matches")
+
+    assert response.status_code == 200
+    assert "Potential match" in response.text
+    assert "match-1" in response.text
+
+
+def test_matches_list_backend_401_returns_login_required(client, monkeypatch) -> None:
+    matches_module = pytest.importorskip("routers.matches")
+    monkeypatch.setattr(
+        matches_module,
+        "backend_client",
+        FakeMatchesClient(list_error=_status_error(401, "invalid_token")),
+    )
+    client.cookies.set("session_token", "token")
+
+    response = client.get("/matches")
+
+    assert response.status_code == 200
+    assert "Login required" in response.text
+
+
+def test_matches_list_backend_500_returns_matches_error(client, monkeypatch) -> None:
+    matches_module = pytest.importorskip("routers.matches")
+    monkeypatch.setattr(
+        matches_module,
+        "backend_client",
+        FakeMatchesClient(list_error=_status_error(500, "db_error")),
+    )
+    client.cookies.set("session_token", "token")
+
+    response = client.get("/matches")
+
+    assert response.status_code == 200
+    assert "Could not load matches" in response.text
+
+
+def test_match_detail_404_returns_match_not_found(client, monkeypatch) -> None:
+    matches_module = pytest.importorskip("routers.matches")
+    monkeypatch.setattr(
+        matches_module,
+        "backend_client",
+        FakeMatchesClient(detail_error=_status_error(404, "match_not_found")),
+    )
+    client.cookies.set("session_token", "token")
+
+    response = client.get("/matches/missing-match")
+
+    assert response.status_code == 200
+    assert "Match not found" in response.text
+
+
+def test_match_detail_backend_500_returns_matches_error(client, monkeypatch) -> None:
+    matches_module = pytest.importorskip("routers.matches")
+    monkeypatch.setattr(
+        matches_module,
+        "backend_client",
+        FakeMatchesClient(detail_error=_status_error(500, "db_error")),
+    )
+    client.cookies.set("session_token", "token")
+
+    response = client.get("/matches/match-1")
+
+    assert response.status_code == 200
+    assert "Could not load matches" in response.text

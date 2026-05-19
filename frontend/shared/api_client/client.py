@@ -88,3 +88,19 @@ class BackendClient:
         )
         r.raise_for_status()
         return r.json()
+
+    async def list_matches(self, *, token: str) -> list[dict]:
+        r = await self._client.get(
+            "/v1/matches/",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    async def get_match(self, *, token: str, match_id: str) -> dict:
+        r = await self._client.get(
+            f"/v1/matches/{match_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r.raise_for_status()
+        return r.json()

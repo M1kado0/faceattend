@@ -3,16 +3,60 @@
 {% block title %}Matches | FaceGuard{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-3xl">
-    <div class="mb-6">
-        <h1 class="text-3xl font-bold">Matches</h1>
-        <p class="mt-2 text-base-content/70">
-            Saved match history is not available yet.
-        </p>
-    </div>
-
-    <div role="alert" class="alert">
-        <span>For now, use the Search page to view live search results.</span>
-    </div>
+{% if not matches %}
+<div role="alert" class="alert">
+    <span>No saved matches yet.</span>
 </div>
+{% else %}
+<ul class="grid grid-cols-1 gap-4 md:grid-cols-2">
+    {% for match in matches %}
+    <li class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title text-base">Potential match</h2>
+            <dl class="space-y-2 text-sm">
+                {% if match.image_thumbnail_url %}
+                <img
+                    src="{{ match.image_thumbnail_url }}"
+                    alt="Matched image preview"
+                    class="h-48 w-full rounded object-cover"
+                >
+                {% endif %}
+                <div>
+                    <dt class="font-medium text-base-content/70">Score</dt>
+                    <dd>{{ "%.3f"|format(match.score) }}</dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-base-content/70">Match ID</dt>
+                    <dd class="break-all">{{ match.match_id }}</dd>
+                </div>
+                {% if match.source_page %}
+                <div>
+                    <dt class="font-medium text-base-content/70">Source page</dt>
+                    <dd class="break-all">{{ match.source_page }}</dd>
+                </div>
+                {% endif %}
+                {% if match.crawled_at %}
+                <div>
+                    <dt class="font-medium text-base-content/70">Crawled at</dt>
+                    <dd class="break-all">{{ match.crawled_at }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+
+            <div class="card-actions justify-end">
+                {% if match.source_url %}
+                <a href="{{ match.source_url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">
+                    Open source
+                </a>
+                {% else %}
+                <a href="/matches/{{ match.match_id }}" class="btn btn-sm">
+                    Details
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
 {% endblock %}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from io import BytesIO
 
 import numpy as np
@@ -11,6 +12,7 @@ from backend.api.ml_client import EmbeddingResult, LivenessCheck
 from backend.api.routes import enroll as enroll_module
 from backend.api.routes import search as search_module
 from backend.db.models.enrollment import Enrollment
+from backend.db.models.match import MatchRow
 from backend.db.models.user import User
 from backend.indexer.store import Match
 
@@ -324,3 +326,48 @@ async def test_search_filters_by_embedding_model_after_liveness(monkeypatch, use
     assert match_row.image_id == "match-1"
     assert session.commit_count == 1
     assert index.searched[0][2] == {"embedding_model_version": "arcface-r100-v1"}
+
+
+@pytest.mark.asyncio
+async def test_search_reuses_existing_persisted_match(monkeypatch, user) -> None:
+    index = RecordingIndex(added=[], searched=[])
+    existing_match = MatchRow(
+        id="persisted-match-1",
+        user_id=user.id,
+        image_id="match-1",
+        source_url="https://example.test/image.jpg",
+        source_page="https://example.test/page",
+        score=0.9,
+        crawled_at=datetime.utcnow(),
+        created_at=datetime.utcnow(),
+    )
+
+    async def fake_log(**kwargs) -> None:
+        return None
+
+    async def fake_liveness(**kwargs) -> LivenessCheck:
+        return LivenessCheck(passed=True, score=0.99, label="Real")
+
+    async def fake_embed(**kwargs) -> EmbeddingResult:
+        return EmbeddingResult(
+            embedding=np.ones(512, dtype=np.float32),
+            model_version="arcface-r100-v1",
+        )
+
+    monkeypatch.setattr(search_module, "log", fake_log)
+    monkeypatch.setattr(search_module, "verify_passive_liveness", fake_liveness)
+    monkeypatch.setattr(search_module, "embed_image", fake_embed)
+    monkeypatch.setattr(search_module, "index", index)
+
+    session = FakeSession(execute_results=[FakeExecuteResult(rows=[existing_match])])
+    response = await search_module.search(
+        photo=_upload("photo.jpg"),
+        liveness_blob=_upload("live.jpg"),
+        user=user,
+        session=session,
+    )
+
+    assert session.added == []
+    assert session.commit_count == 0
+    assert response.matches[0].match_id == "persisted-match-1"
+    assert response.matches[0].score == 0.9

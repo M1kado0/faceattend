@@ -27,7 +27,7 @@ async def list_matches(
     statement = select(MatchRow).where(MatchRow.user_id == user.id)
     if since is not None:
         statement = statement.where(MatchRow.created_at >= since)
-    statement = statement.order_by(MatchRow.created_at.desc())
+    statement = statement.order_by(MatchRow.created_at.desc(), MatchRow.score.desc())
     result = await session.execute(statement)
     matches = result.scalars().all()
     return [

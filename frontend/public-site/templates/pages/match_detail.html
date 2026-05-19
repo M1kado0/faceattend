@@ -7,12 +7,28 @@
     <div class="mb-6">
         <h1 class="text-3xl font-bold">Match detail</h1>
         <p class="mt-2 break-all text-base-content/70">
-            {{ match_id }}
+            {{ match.match_id }}
         </p>
     </div>
-
-    <div role="alert" class="alert">
-        <span>Detailed match pages will be available after match persistence is implemented.</span>
+    <div class="mb-6">
+        <dt class="font-medium text-base-content/70">Score</dt>
+        <dd>{{ "%.3f"|format(match.score) }}</dd>
     </div>
+    <div class="mb-6">
+        <dt class="font-medium text-base-content/70">Match ID</dt>
+        <dd class="break-all">{{ match.match_id }}</dd>
+    </div>
+    {% if match.source_page %}
+    <div class="mb-6">
+        <dt class="font-medium text-base-content/70">Source page</dt>
+        <dd class="break-all">{{ match.source_page }}</dd>
+    </div>
+    {% endif %}
+    {% if match.crawled_at %}
+    <div class="mb-6">
+        <dt class="font-medium text-base-content/70">Crawled at</dt>
+        <dd class="break-all">{{ match.crawled_at }}</dd>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

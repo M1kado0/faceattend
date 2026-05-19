@@ -9,6 +9,7 @@ from typing import Annotated
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.dependencies import get_current_user
@@ -114,24 +115,41 @@ async def search(
         )
         raise HTTPException(500, "index_error") from exc
 
+    embedding_ids = [result_match.embedding_id for result_match in results]
+    existing_matches_by_image_id = {}
+    if embedding_ids:
+        existing_result = await session.execute(
+            select(MatchRow).where(
+                MatchRow.user_id == user.id,
+                MatchRow.image_id.in_(embedding_ids),
+            )
+        )
+        existing_matches_by_image_id = {
+            match.image_id: match for match in existing_result.scalars().all()
+        }
+
     matches = []
+    search_created_at = datetime.utcnow()
+    has_new_matches = False
     for result_match in results:
         metadata = result_match.metadata
-        now = datetime.utcnow()
-        crawled_at = metadata.get("crawled_at", now)
+        crawled_at = metadata.get("crawled_at", search_created_at)
 
-        match_row = MatchRow(
-            id=str(uuid.uuid4()),
-            user_id=user.id,
-            image_id=result_match.embedding_id,
-            source_url=str(metadata.get("source_url", "")),
-            source_page=str(metadata.get("source_page", "")),
-            score=float(result_match.score),
-            crawled_at=crawled_at,
-            notified_at=None,
-            created_at=now,
-        )
-        session.add(match_row)
+        match_row = existing_matches_by_image_id.get(result_match.embedding_id)
+        if match_row is None:
+            match_row = MatchRow(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                image_id=result_match.embedding_id,
+                source_url=str(metadata.get("source_url", "")),
+                source_page=str(metadata.get("source_page", "")),
+                score=float(result_match.score),
+                crawled_at=crawled_at,
+                notified_at=None,
+                created_at=search_created_at,
+            )
+            session.add(match_row)
+            has_new_matches = True
 
         matches.append(
             Match(
@@ -144,17 +162,18 @@ async def search(
                 image_thumbnail_url=result_match.metadata.get("image_thumbnail_url"),
             )
         )
-    try:
-        await session.commit()
-    except Exception as exc:
-        await session.rollback()
-        await log(
-            actor_id=user.id,
-            actor_type=user.role,
-            action="search.match_persist_error",
-            target_id=user.id,
-        )
-        raise HTTPException(500, "match_persist_error") from exc
+    if has_new_matches:
+        try:
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            await log(
+                actor_id=user.id,
+                actor_type=user.role,
+                action="search.match_persist_error",
+                target_id=user.id,
+            )
+            raise HTTPException(500, "match_persist_error") from exc
 
     await log(actor_id=user.id, actor_type=user.role, action="search.success", target_id=user.id)
     return SearchResponse(query_id=str(uuid.uuid4()), matches=matches)
