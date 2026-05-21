@@ -16,11 +16,9 @@ FaceGuard is a production-grade pipeline that:
 6. **Monitors** the web continuously, notifying users when new matches appear
 7. **Initiates takedowns** with built-in DMCA-style workflow
 
-Two web surfaces:
-- **Public site** — users enroll faces, search, view matches, request takedowns
-- **Admin panel** — internal tool for moderation, crawler health, model management, audit logs
+The web surface is a **public site** where users enroll faces, search, view matches, and request takedowns.
 
-Both surfaces are **separate FastAPI applications** that render server-side HTML using **Jinja2** templates with **HTMX** for interactivity. No React, no TypeScript, no build step. Pure Python end-to-end.
+The web app renders server-side HTML using **Jinja2** templates with **HTMX** for interactivity. No React, no TypeScript, no build step. Pure Python end-to-end.
 
 ---
 
@@ -39,18 +37,16 @@ Approach: **passive liveness** (single image/short clip analysis) as default, **
 ## Architecture
 
 ```
-┌──────────────────┐   ┌──────────────────┐
-│   Public Site    │   │   Admin Panel    │
-│ FastAPI+Jinja2   │   │ FastAPI+Jinja2   │
-│     + HTMX       │   │     + HTMX       │
-└────────┬─────────┘   └────────┬─────────┘
-         │                      │
-         └──────────┬───────────┘
-                    │ (HTTP / JSON)
+┌──────────────────┐
+│   Public Site    │
+│ FastAPI+Jinja2   │
+│     + HTMX       │
+└────────┬─────────┘
+         │ (HTTP / JSON)
             ┌───────▼────────┐
             │  Backend API   │
             │   (FastAPI)    │
-            │  Auth · RBAC   │
+            │     Auth       │
             └───────┬────────┘
                     │
         ┌───────────┼───────────────────────┐
@@ -96,7 +92,7 @@ Approach: **passive liveness** (single image/short clip analysis) as default, **
 
 | Layer | Tooling |
 |---|---|
-| Web UI (public + admin) | **FastAPI + Jinja2 + HTMX** — pure Python, no build step |
+| Web UI (public site) | **FastAPI + Jinja2 + HTMX** — pure Python, no build step |
 | Styling | **Tailwind CSS** via CDN, **DaisyUI** for pre-built components |
 | Webcam capture | ~50 lines of vanilla **JavaScript** (only place JS is needed) |
 | Forms | **WTForms** + Pydantic validation |
@@ -133,17 +129,8 @@ Approach: **passive liveness** (single image/short clip analysis) as default, **
 - 🗑 **Full GDPR controls** — export your data, delete your account, withdraw consent
 - 💳 **Subscription tiers** (free + paid)
 
-### For admins (admin panel)
-- 👥 **User management** — view, suspend, audit individual accounts
-- 🕷 **Crawler dashboard** — spider health, throughput, robots.txt compliance
-- 🤖 **Model management** — current embedding model version, re-embed jobs
-- 📈 **Analytics** — searches/day, match volumes, takedown success rates
-- 🚨 **Abuse detection** — flagged queries, suspicious patterns
-- 🧩 **Face clusters** — manually merge/split identity clusters
-- 📜 **Audit log viewer** — GDPR-compliant query trail
-
 ### Cross-cutting
-- 🔐 **RBAC**: roles for `user`, `moderator`, `admin`
+- 🔐 **Authentication** for liveness-gated enrollment and search
 - 🛡 **Rate limiting** per IP, per account, per API key
 - 🗝 **Encryption at rest** for biometric embeddings
 - 📦 **Model versioning + re-embedding pipeline**
@@ -172,9 +159,8 @@ faceguard/
 │   ├── clustering/
 │   ├── phash/
 │   └── CLAUDE.md
-├── frontend/             # Two FastAPI web apps with Jinja2 + HTMX
+├── frontend/             # FastAPI public site with Jinja2 + HTMX
 │   ├── public-site/      # End-user-facing app
-│   ├── admin-panel/      # Admin-only app
 │   ├── shared/           # Shared templates, static assets
 │   └── CLAUDE.md
 ├── infra/                # Docker, K8s, Terraform
@@ -207,7 +193,6 @@ cd faceguard
 cp .env.example .env
 docker compose up
 # Public site:   http://localhost:8000
-# Admin panel:   http://localhost:8001
 # Backend API:   http://localhost:8002
 ```
 
@@ -237,7 +222,7 @@ Biometric data is **Article 9 special category data** under GDPR — stricter pr
 - [`backend/CLAUDE.md`](./backend/CLAUDE.md) — API, indexer, monitor, takedown
 - [`crawler/CLAUDE.md`](./crawler/CLAUDE.md) — Crawler architecture & ethics
 - [`ml/CLAUDE.md`](./ml/CLAUDE.md) — Inference, liveness, clustering
-- [`frontend/CLAUDE.md`](./frontend/CLAUDE.md) — Public site + admin panel (Jinja2 + HTMX)
+- [`frontend/CLAUDE.md`](./frontend/CLAUDE.md) — Public site (Jinja2 + HTMX)
 - [`docs/adr/`](./docs/adr) — Architecture Decision Records
 
 ---

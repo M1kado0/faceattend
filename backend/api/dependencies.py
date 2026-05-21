@@ -44,10 +44,3 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=401, detail="invalid_credentials")
     return user
-
-
-async def require_admin(user: Annotated[User, Depends(get_current_user)]) -> User:
-    """Gate admin-only routes."""
-    if user.role not in {"admin", "moderator"}:
-        raise HTTPException(status_code=403, detail="forbidden")
-    return user

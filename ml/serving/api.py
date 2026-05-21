@@ -40,11 +40,6 @@ async def embed(image: UploadFile) -> dict:
     }
 
 
-@app.post("/v1/detect")
-async def detect(image: UploadFile) -> dict:
-    raise NotImplementedError
-
-
 @app.post("/v1/liveness/passive")
 async def liveness_passive(blob: UploadFile) -> dict:
     raw = await blob.read()
