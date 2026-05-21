@@ -1,6 +1,6 @@
-# FaceGuard — Face Indexing & Search Pipeline
+# FaceGuard — Face Monitoring & Match Dashboard
 
-> Protect users' photos online by finding where their images appear across the public internet — with built-in antispoofing, liveness verification, and a takedown workflow.
+> Protect users' photos online by finding where their images appear across the public internet — with built-in antispoofing, liveness verification, and continuous match monitoring.
 
 ---
 
@@ -9,14 +9,13 @@
 FaceGuard is a production-grade pipeline that:
 
 1. **Crawls** public images from the open web at scale
-2. **Verifies liveness** at enrollment and search (anti-spoofing)
+2. **Verifies liveness** during enrollment (anti-spoofing)
 3. **Detects and embeds** faces using a high-throughput ML inference stack
 4. **Indexes** hundreds of millions of face embeddings in a vector database
-5. **Searches** for matches via a web interface and a REST API
-6. **Monitors** the web continuously, notifying users when new matches appear
-7. **Initiates takedowns** with built-in DMCA-style workflow
+5. **Scans enrolled faces** against the index and persists match results
+6. **Monitors** the web continuously, updating each user's match dashboard as new images are indexed
 
-The web surface is a **public site** where users enroll faces, search, view matches, and request takedowns.
+The web surface is a **public site** where users enroll their face once and review dynamically updated match results.
 
 The web app renders server-side HTML using **Jinja2** templates with **HTMX** for interactivity. No React, no TypeScript, no build step. Pure Python end-to-end.
 
@@ -27,7 +26,7 @@ The web app renders server-side HTML using **Jinja2** templates with **HTMX** fo
 This system processes biometric data with significant abuse potential. Without liveness checks, anyone could enroll a stranger's face and use the platform as a stalking tool.
 
 - **At enrollment**: liveness proves the person adding a face physically owns it
-- **At search**: liveness proves the searcher is looking for their own face
+- **During monitoring**: matches are generated only for liveness-verified enrollments, avoiding a separate manual search flow
 - **Antispoofing models** reject printed photos, screen replays, masks, and deepfakes
 
 Approach: **passive liveness** (single image/short clip analysis) as default, **active liveness** (blink/turn challenges) as fallback when passive confidence is low.
@@ -122,15 +121,13 @@ Approach: **passive liveness** (single image/short clip analysis) as default, **
 ### For end users (public site)
 - 🪪 **Account registration** with email verification
 - 📸 **Face enrollment** with passive/active liveness check
-- 🔍 **Reverse image search** with liveness-protected query flow
-- 📊 **Match dashboard** — see where your face appears, sorted by confidence
-- 🔔 **Continuous monitoring** — email/webhook alerts for new matches
-- 📝 **Takedown requests** — generate DMCA notices, track removal status
+- 📊 **Dynamic match dashboard** — see where your enrolled face appears, sorted by confidence
+- 🔔 **Continuous monitoring** — dashboard updates and optional alerts for new matches
 - 🗑 **Full GDPR controls** — export your data, delete your account, withdraw consent
 - 💳 **Subscription tiers** (free + paid)
 
 ### Cross-cutting
-- 🔐 **Authentication** for liveness-gated enrollment and search
+- 🔐 **Authentication** for liveness-gated enrollment and match review
 - 🛡 **Rate limiting** per IP, per account, per API key
 - 🗝 **Encryption at rest** for biometric embeddings
 - 📦 **Model versioning + re-embedding pipeline**
@@ -145,7 +142,7 @@ faceguard/
 │   ├── api/              # REST endpoints
 │   ├── indexer/          # Vector index management
 │   ├── monitor/          # Re-crawl & notification scheduler
-│   ├── takedown/         # DMCA workflow
+│   ├── takedown/         # Future takedown utilities
 │   ├── audit/            # Audit logging
 │   └── CLAUDE.md
 ├── crawler/              # Distributed web crawler
@@ -205,8 +202,8 @@ Biometric data is **Article 9 special category data** under GDPR — stricter pr
 - ✅ **Data minimization**: store embeddings, not raw face images, beyond processing window
 - ✅ **Right to erasure**: full account + embedding deletion in <30 days
 - ✅ **Right to portability**: data export available
-- ✅ **Purpose limitation**: search only your own face (enforced by enrollment liveness)
-- ✅ **Audit trail**: every search logged with actor, target, timestamp, justification
+- ✅ **Purpose limitation**: only monitor faces enrolled through liveness verification
+- ✅ **Audit trail**: every enrollment, match scan, and biometric data operation logged with actor, target, timestamp, and justification
 - ✅ **EU AI Act**: face recognition may fall under high-risk; conformity assessment required pre-launch
 - ✅ **Robots.txt respect** at crawl time
 - ✅ **Source attribution**: only publicly accessible URLs crawled
@@ -218,7 +215,7 @@ Biometric data is **Article 9 special category data** under GDPR — stricter pr
 ## Documentation
 
 - [`CLAUDE.md`](./CLAUDE.md) — Instructions for Claude Code (root)
-- [`backend/CLAUDE.md`](./backend/CLAUDE.md) — API, indexer, monitor, takedown
+- [`backend/CLAUDE.md`](./backend/CLAUDE.md) — API, indexer, monitor, audit
 - [`crawler/CLAUDE.md`](./crawler/CLAUDE.md) — Crawler architecture & ethics
 - [`ml/CLAUDE.md`](./ml/CLAUDE.md) — Inference, liveness, clustering
 - [`frontend/CLAUDE.md`](./frontend/CLAUDE.md) — Public site (Jinja2 + HTMX)

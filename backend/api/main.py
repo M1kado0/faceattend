@@ -8,8 +8,6 @@ from backend.api.routes import (
     enroll,
     matches,
     notifications,
-    search,
-    takedown,
     users,
 )
 
@@ -24,9 +22,7 @@ app = FastAPI(
 app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
 app.include_router(users.router, prefix="/v1/users", tags=["users"])
 app.include_router(enroll.router, prefix="/v1", tags=["enroll"])
-app.include_router(search.router, prefix="/v1", tags=["search"])
 app.include_router(matches.router, prefix="/v1/matches", tags=["matches"])
-app.include_router(takedown.router, prefix="/v1/takedown", tags=["takedown"])
 app.include_router(notifications.router, prefix="/v1/notifications", tags=["notifications"])
 app.include_router(billing.router, prefix="/v1/webhooks", tags=["billing"])
 
