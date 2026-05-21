@@ -9,7 +9,7 @@ load_dotenv()
 
 DATABASE_URI = os.getenv(
     "POSTGRES_URI",
-    "postgresql+asyncpg://user:pass@localhost:5432/faceguard",
+    "postgresql+asyncpg://user:pass@localhost:5432/faceattend",
 )
 
 engine = create_async_engine(DATABASE_URI, echo=False, future=True)

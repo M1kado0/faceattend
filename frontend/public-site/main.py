@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from routers import auth, billing, enroll, matches, settings  # noqa: E402
 
-app = FastAPI(title="FaceGuard — Public Site", version="0.1.0")
+app = FastAPI(title="FaceAttend — Public Site", version="0.1.0")
 
 ROOT = Path(__file__).resolve().parent
 

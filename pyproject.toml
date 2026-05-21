@@ -1,5 +1,5 @@
 [project]
-name = "faceguard"
+name = "faceattend"
 version = "0.1.0"
 description = "Find where your face appears across the public internet, request takedowns."
 readme = "README.md"
@@ -48,6 +48,7 @@ dependencies = [
     "psycopg2-binary>=2.9.12",
     "torch>=2.12.0",
     "onnxscript>=0.7.0",
+    "mediapipe>=0.10.35",
 ]
 
 [project.optional-dependencies]

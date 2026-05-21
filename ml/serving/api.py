@@ -16,7 +16,7 @@ from ml.pipeline.face import (
     verify_passive_liveness,
 )
 
-app = FastAPI(title="FaceGuard ML Service", version="0.1.0")
+app = FastAPI(title="FaceAttend ML Service", version="0.1.0")
 
 
 

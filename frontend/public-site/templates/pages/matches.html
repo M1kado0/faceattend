@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Matches | FaceGuard{% endblock %}
+{% block title %}Matches | FaceAttend{% endblock %}
 
 {% block content %}
 {% if not has_enrollments %}
@@ -10,7 +10,7 @@
 </div>
 {% elif not matches %}
 <div role="alert" class="alert">
-    <span>No matches found yet. FaceGuard will continue checking as new images are indexed.</span>
+    <span>No matches found yet. FaceAttend will continue checking as new images are indexed.</span>
 </div>
 {% else %}
 <ul class="grid grid-cols-1 gap-4 md:grid-cols-2">

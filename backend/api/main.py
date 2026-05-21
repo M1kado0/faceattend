@@ -12,7 +12,7 @@ from backend.api.routes import (
 )
 
 app = FastAPI(
-    title="FaceGuard Backend API",
+    title="FaceAttend Backend API",
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",

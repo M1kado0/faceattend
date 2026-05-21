@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: pass
-      POSTGRES_DB: faceguard
+      POSTGRES_DB: faceattend
     ports:
       - "5433:5432"
     volumes:

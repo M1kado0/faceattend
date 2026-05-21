@@ -52,7 +52,7 @@ def _print_liveness(result: dict) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Smoke test FaceGuard's local face pipeline.")
+    parser = argparse.ArgumentParser(description="Smoke test FaceAttend's local face pipeline.")
     parser.add_argument("image", type=Path, help="Path to an image file.")
     args = parser.parse_args()
 

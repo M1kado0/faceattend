@@ -1,4 +1,4 @@
-"""BaseSpider — shared behavior for all FaceGuard spiders."""
+"""BaseSpider — shared behavior for all FaceAttend spiders."""
 
 from __future__ import annotations
 

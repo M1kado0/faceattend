@@ -1,11 +1,11 @@
 """Scrapy settings — applies to every spider unless overridden via custom_settings."""
 
-BOT_NAME = "faceguard"
+BOT_NAME = "faceattend"
 SPIDER_MODULES = ["crawler.spiders"]
 NEWSPIDER_MODULE = "crawler.spiders"
 
 # LEGAL: identify ourselves clearly; never spoof.
-USER_AGENT = "FaceGuardBot/1.0 (+https://faceguard.io/bot)"
+USER_AGENT = "FaceAttendBot/1.0 (+https://faceattend.io/bot)"
 
 # LEGAL: robots.txt is non-negotiable; overrides require docs/legal/crawl-overrides.md.
 ROBOTSTXT_OBEY = True
