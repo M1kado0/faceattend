@@ -17,10 +17,9 @@ SESSION_COOKIE_NAME = "session_token"
 SESSION_MAX_AGE_SECONDS = 15 * 60
 
 ROOT = Path(__file__).resolve().parents[1]
-SHARED = ROOT.parent / "shared"
 
 templates = Jinja2Templates(
-    directory=[ROOT / "templates", SHARED / "templates"],
+    directory=ROOT / "templates",
 )
 
 backend_client = BackendClient(BACKEND_API_URL)

@@ -161,7 +161,6 @@ faceguard/
 │   └── CLAUDE.md
 ├── frontend/             # FastAPI public site with Jinja2 + HTMX
 │   ├── public-site/      # End-user-facing app
-│   ├── shared/           # Shared templates, static assets
 │   └── CLAUDE.md
 ├── infra/                # Docker, K8s, Terraform
 ├── scripts/

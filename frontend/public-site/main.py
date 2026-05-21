@@ -16,12 +16,11 @@ from routers import auth, billing, enroll, matches, settings  # noqa: E402
 app = FastAPI(title="FaceGuard — Public Site", version="0.1.0")
 
 ROOT = Path(__file__).resolve().parent
-SHARED = ROOT.parent / "shared"
 
-app.mount("/static", StaticFiles(directory=SHARED / "static"), name="static")
+app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 templates = Jinja2Templates(
-    directory=[ROOT / "templates", SHARED / "templates"],
+    directory=ROOT / "templates",
 )
 
 @app.get("/", response_class=HTMLResponse)

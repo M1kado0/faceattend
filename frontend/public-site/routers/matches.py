@@ -8,8 +8,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-
-from frontend.shared.api_client.client import BackendClient
+from services.api_client import BackendClient
 
 load_dotenv()
 
@@ -21,10 +20,9 @@ backend_client = BackendClient(BACKEND_API_URL)
 router = APIRouter()
 
 ROOT = Path(__file__).resolve().parents[1]
-SHARED = ROOT.parent / "shared"
 
 templates = Jinja2Templates(
-    directory=[ROOT / "templates", SHARED / "templates"],
+    directory=ROOT / "templates",
 )
 
 

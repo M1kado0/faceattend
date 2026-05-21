@@ -20,10 +20,9 @@ backend_client = BackendClient(BACKEND_API_URL)
 router = APIRouter()
 
 ROOT = Path(__file__).resolve().parents[1]
-SHARED = ROOT.parent / "shared"
 
 templates = Jinja2Templates(
-    directory=[ROOT / "templates", SHARED / "templates"],
+    directory=ROOT / "templates",
 )
 
 
