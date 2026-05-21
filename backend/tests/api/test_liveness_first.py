@@ -11,6 +11,7 @@ from starlette.datastructures import UploadFile
 from backend.api.ml_client import EmbeddingResult, LivenessCheck
 from backend.api.routes import enroll as enroll_module
 from backend.api.routes import search as search_module
+from backend.api.services import match_scan as match_scan_module
 from backend.db.models.enrollment import Enrollment
 from backend.db.models.match import MatchRow
 from backend.db.models.user import User
@@ -174,6 +175,8 @@ async def test_enroll_indexes_only_after_passed_liveness(monkeypatch, user) -> N
     monkeypatch.setattr(enroll_module, "verify_passive_liveness", fake_liveness)
     monkeypatch.setattr(enroll_module, "embed_image", fake_embed)
     monkeypatch.setattr(enroll_module, "index", index)
+    monkeypatch.setattr(match_scan_module, "log", fake_log)
+    monkeypatch.setattr(match_scan_module, "index", index)
 
     session = FakeSession()
     response = await enroll_module.enroll(
@@ -182,8 +185,8 @@ async def test_enroll_indexes_only_after_passed_liveness(monkeypatch, user) -> N
         user=user,
         session=session
     )
-    assert len(session.added) == 1
-    enrollment = session.added[0]
+    assert len(session.added) == 2
+    enrollment = next(obj for obj in session.added if isinstance(obj, Enrollment))
 
     assert response.embedding_model_version == "arcface-r100-v1"
     assert index.added[0][2] == {
@@ -200,6 +203,42 @@ async def test_enroll_indexes_only_after_passed_liveness(monkeypatch, user) -> N
     assert enrollment.embedding_model_version == "arcface-r100-v1"
     assert enrollment.embedding_id == index.added[0][0]
     assert response.enrollment_id == enrollment.id
+
+
+@pytest.mark.asyncio
+async def test_enroll_rejects_when_enrollment_limit_reached(monkeypatch, user) -> None:
+    logs = []
+    existing_enrollments = [
+        Enrollment(
+            id=f"enrollment-{index}",
+            user_id=user.id,
+            embedding_id=f"embedding-{index}",
+            embedding_model_version="arcface-r100-v1",
+        )
+        for index in range(3)
+    ]
+
+    async def fake_log(**kwargs) -> None:
+        logs.append(kwargs["action"])
+
+    async def fake_liveness(**kwargs) -> LivenessCheck:
+        raise AssertionError("liveness must not run when enrollment limit is reached")
+
+    monkeypatch.setattr(enroll_module, "log", fake_log)
+    monkeypatch.setattr(enroll_module, "verify_passive_liveness", fake_liveness)
+
+    session = FakeSession(execute_results=[FakeExecuteResult(rows=existing_enrollments)])
+    with pytest.raises(Exception) as exc_info:
+        await enroll_module.enroll(
+            photo=_upload("photo.jpg"),
+            liveness_blob=_upload("live.jpg"),
+            user=user,
+            session=session,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "enrollment_limit_reached"
+    assert logs == ["enroll.attempt", "enroll.limit_reached"]
 
 
 @pytest.mark.asyncio
@@ -309,7 +348,8 @@ async def test_search_filters_by_embedding_model_after_liveness(monkeypatch, use
     monkeypatch.setattr(search_module, "log", fake_log)
     monkeypatch.setattr(search_module, "verify_passive_liveness", fake_liveness)
     monkeypatch.setattr(search_module, "embed_image", fake_embed)
-    monkeypatch.setattr(search_module, "index", index)
+    monkeypatch.setattr(match_scan_module, "log", fake_log)
+    monkeypatch.setattr(match_scan_module, "index", index)
 
     session = FakeSession()
     response = await search_module.search(
@@ -357,7 +397,8 @@ async def test_search_reuses_existing_persisted_match(monkeypatch, user) -> None
     monkeypatch.setattr(search_module, "log", fake_log)
     monkeypatch.setattr(search_module, "verify_passive_liveness", fake_liveness)
     monkeypatch.setattr(search_module, "embed_image", fake_embed)
-    monkeypatch.setattr(search_module, "index", index)
+    monkeypatch.setattr(match_scan_module, "log", fake_log)
+    monkeypatch.setattr(match_scan_module, "index", index)
 
     session = FakeSession(execute_results=[FakeExecuteResult(rows=[existing_match])])
     response = await search_module.search(

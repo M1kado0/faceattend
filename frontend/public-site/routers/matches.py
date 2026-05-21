@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from frontend.shared.api_client.client import BackendClient
@@ -32,11 +32,9 @@ templates = Jinja2Templates(
 async def matches_list(request: Request):
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
-        return templates.TemplateResponse(
-            request=request,
-            name="partials/login_required.html",
-        )
+        return RedirectResponse("/login", status_code=303)
     try:
+        enrollments = await backend_client.list_enrollments(token=token)
         matches = await backend_client.list_matches(token=token)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 401:
@@ -56,7 +54,7 @@ async def matches_list(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="pages/matches.html",
-        context={"matches": matches},
+        context={"matches": matches, "has_enrollments": bool(enrollments)},
     )
 
 

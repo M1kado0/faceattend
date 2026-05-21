@@ -19,6 +19,7 @@ from backend.api.ml_client import (
     verify_passive_liveness,
 )
 from backend.api.schemas import EnrollResponse
+from backend.api.services.match_scan import scan_and_persist_matches
 from backend.audit.logger import log
 from backend.db.models.enrollment import Enrollment
 from backend.db.models.user import User
@@ -27,6 +28,7 @@ from backend.indexer.store import get_store
 
 load_dotenv()
 ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8003")
+MAX_ACTIVE_ENROLLMENTS = 3
 index = get_store()
 router = APIRouter()
 
@@ -39,6 +41,18 @@ async def enroll(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> EnrollResponse:
     await log(actor_id=user.id, actor_type=user.role, action="enroll.attempt", target_id=user.id)
+
+    existing_result = await session.execute(select(Enrollment).where(Enrollment.user_id == user.id))
+    existing_enrollments = existing_result.scalars().all()
+    if len(existing_enrollments) >= MAX_ACTIVE_ENROLLMENTS:
+        await log(
+            actor_id=user.id,
+            actor_type=user.role,
+            action="enroll.limit_reached",
+            target_id=user.id,
+            metadata={"max_active_enrollments": MAX_ACTIVE_ENROLLMENTS},
+        )
+        raise HTTPException(status_code=409, detail="enrollment_limit_reached")
 
     # AUDIT: liveness must run before embedding to prevent non-consensual enrollment.
     liveness_bytes = await liveness_blob.read()
@@ -150,6 +164,15 @@ async def enroll(
         raise HTTPException(500, "db_error") from exc
 
     await log(actor_id=user.id, actor_type=user.role, action="enroll.success", target_id=user.id)
+
+    await scan_and_persist_matches(
+        user=user,
+        embedding=result.embedding,
+        model_version=result.model_version,
+        session=session,
+        top_k=10,
+    )
+
     return EnrollResponse(enrollment_id=enrollment.id, embedding_model_version=result.model_version)
 
 

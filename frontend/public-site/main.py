@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from routers import auth, billing, enroll, matches, search, settings, takedowns  # noqa: E402
+from routers import auth, billing, enroll, matches, settings  # noqa: E402
 
 app = FastAPI(title="FaceGuard — Public Site", version="0.1.0")
 
@@ -33,8 +33,6 @@ async def index(request: Request):
 
 app.include_router(auth.router, tags=["auth"])
 app.include_router(enroll.router, tags=["enroll"])
-app.include_router(search.router, tags=["search"])
 app.include_router(matches.router, tags=["matches"])
-app.include_router(takedowns.router, tags=["takedowns"])
 app.include_router(settings.router, tags=["settings"])
 app.include_router(billing.router, tags=["billing"])

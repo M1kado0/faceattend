@@ -3,9 +3,14 @@
 {% block title %}Matches | FaceGuard{% endblock %}
 
 {% block content %}
-{% if not matches %}
+{% if not has_enrollments %}
 <div role="alert" class="alert">
-    <span>No saved matches yet.</span>
+    <span>Enroll your face first to start monitoring matches.</span>
+    <a href="/enroll" class="btn btn-primary btn-sm">Enroll</a>
+</div>
+{% elif not matches %}
+<div role="alert" class="alert">
+    <span>No matches found yet. FaceGuard will continue checking as new images are indexed.</span>
 </div>
 {% else %}
 <ul class="grid grid-cols-1 gap-4 md:grid-cols-2">

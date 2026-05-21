@@ -5,11 +5,19 @@
         </div>
         <div class="flex-none">
             <ul class="menu menu-horizontal px-1">
+                {% if request.cookies.get("session_token") %}
                 <li><a href="/enroll">Enroll</a></li>
-                <li><a href="/search">Search</a></li>
                 <li><a href="/matches">Matches</a></li>
-                <li><a href="/takedowns">Takedowns</a></li>
                 <li><a href="/settings">Settings</a></li>
+                <li>
+                    <form method="post" action="/logout">
+                        <button type="submit">Logout</button>
+                    </form>
+                </li>
+                {% else %}
+                <li><a href="/login">Login</a></li>
+                <li><a href="/register">Register</a></li>
+                {% endif %}
             </ul>
         </div>
     </div>

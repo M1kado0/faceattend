@@ -5,7 +5,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from services.api_client import BackendClient
 
@@ -13,6 +13,7 @@ load_dotenv()
 
 BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8002")
 SESSION_COOKIE_NAME = "session_token"
+MAX_ACTIVE_ENROLLMENTS = 3
 
 backend_client = BackendClient(BACKEND_API_URL)
 
@@ -28,9 +29,35 @@ templates = Jinja2Templates(
 
 @router.get("/enroll", response_class=HTMLResponse)
 async def enroll_page(request: Request):
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not token:
+        return RedirectResponse("/login", status_code=303)
+
+    try:
+        enrollments = await backend_client.list_enrollments(token=token)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            return templates.TemplateResponse(
+                request=request,
+                name="partials/login_required.html",
+            )
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/enroll_error.html",
+        )
+    except httpx.RequestError:
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/backend_unavailable.html",
+        )
+
     return templates.TemplateResponse(
         request=request,
         name="pages/enroll.html",
+        context={
+            "enrollments": enrollments,
+            "max_active_enrollments": MAX_ACTIVE_ENROLLMENTS,
+        },
     )
 
 
@@ -47,7 +74,7 @@ async def enroll(request: Request, photo: UploadFile, liveness_blob: UploadFile)
     liveness_bytes = await liveness_blob.read()
 
     try:
-        enrollment = await backend_client.enroll(
+        await backend_client.enroll(
             photo=photo_bytes,
             liveness_blob=liveness_bytes,
             token=token,
@@ -56,10 +83,9 @@ async def enroll(request: Request, photo: UploadFile, liveness_blob: UploadFile)
             liveness_filename=liveness_blob.filename or "liveness.jpg",
             liveness_content_type=liveness_blob.content_type or "application/octet-stream",
         )
-        return templates.TemplateResponse(
-            request=request,
-            name="partials/enroll_success.html",
-            context={"enrollment": enrollment},
+        return Response(
+            status_code=204,
+            headers={"HX-Redirect": "/matches"},
         )
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 403:
@@ -72,6 +98,11 @@ async def enroll(request: Request, photo: UploadFile, liveness_blob: UploadFile)
                     request=request,
                     name="partials/liveness_failed.html",
                 )
+        if exc.response.status_code == 409:
+            return templates.TemplateResponse(
+                request=request,
+                name="partials/enrollment_limit_reached.html",
+            )
         if exc.response.status_code == 401:
             return templates.TemplateResponse(
                 request=request,
@@ -86,3 +117,36 @@ async def enroll(request: Request, photo: UploadFile, liveness_blob: UploadFile)
             request=request,
             name="partials/backend_unavailable.html",
         )
+
+
+@router.post("/enrollments/{enrollment_id}/delete", response_class=HTMLResponse)
+async def delete_enrollment(request: Request, enrollment_id: str):
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not token:
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/login_required.html",
+        )
+
+    try:
+        await backend_client.delete_enrollment(token=token, enrollment_id=enrollment_id)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            return templates.TemplateResponse(
+                request=request,
+                name="partials/login_required.html",
+            )
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/enroll_error.html",
+        )
+    except httpx.RequestError:
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/backend_unavailable.html",
+        )
+
+    return Response(
+        status_code=204,
+        headers={"HX-Redirect": "/enroll"},
+    )

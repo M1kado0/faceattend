@@ -89,6 +89,22 @@ class BackendClient:
         r.raise_for_status()
         return r.json()
 
+    async def list_enrollments(self, *, token: str) -> list[dict]:
+        r = await self._client.get(
+            "/v1/enrollments",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    async def delete_enrollment(self, *, token: str, enrollment_id: str) -> dict[str, str]:
+        r = await self._client.delete(
+            f"/v1/enrollments/{enrollment_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r.raise_for_status()
+        return r.json()
+
     async def list_matches(self, *, token: str) -> list[dict]:
         r = await self._client.get(
             "/v1/matches/",

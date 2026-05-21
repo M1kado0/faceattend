@@ -11,6 +11,43 @@
         </p>
     </div>
 
+    {% set enrollment_count = enrollments|length %}
+    {% set can_enroll = enrollment_count < max_active_enrollments %}
+
+    {% if enrollments %}
+    <div class="mb-6">
+        <h2 class="mb-3 text-lg font-semibold">Active enrollments</h2>
+        <ul class="space-y-3">
+            {% for enrollment in enrollments %}
+            <li class="flex items-center justify-between gap-4 rounded border border-base-300 bg-base-100 p-4">
+                <div class="min-w-0 text-sm">
+                    <p class="font-medium">Enrollment {{ loop.index }}</p>
+                    <p class="break-all text-base-content/70">
+                        {{ enrollment.embedding_model_version }}
+                    </p>
+                    <p class="text-base-content/60">{{ enrollment.created_at }}</p>
+                </div>
+                <form
+                    hx-post="/enrollments/{{ enrollment.id }}/delete"
+                    hx-target="#enroll-result"
+                    hx-swap="innerHTML"
+                >
+                    <button type="submit" class="btn btn-outline btn-error btn-sm">
+                        Delete
+                    </button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if not can_enroll %}
+    <div role="alert" class="alert mb-6">
+        <span>Delete an existing enrollment before adding another.</span>
+    </div>
+    {% endif %}
+
     <div class="card bg-base-100 shadow">
         <div class="card-body">
             <form
@@ -49,7 +86,7 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" {% if not can_enroll %}disabled{% endif %}>
                         Enroll
                     </button>
 

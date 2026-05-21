@@ -27,7 +27,10 @@ def _request_error() -> httpx.RequestError:
 @dataclass
 class FakeEnrollClient:
     result: dict | None = None
+    enrollments: list[dict] | None = None
     error: Exception | None = None
+    list_error: Exception | None = None
+    delete_error: Exception | None = None
 
     async def enroll(self, **kwargs) -> dict:
         if self.error is not None:
@@ -37,38 +40,55 @@ class FakeEnrollClient:
             "embedding_model_version": "arcface-r100-v1",
         }
 
-
-@dataclass
-class FakeSearchClient:
-    result: list[dict] | None = None
-    error: Exception | None = None
-
-    async def search(self, **kwargs) -> list[dict]:
-        if self.error is not None:
-            raise self.error
-        return self.result or [
+    async def list_enrollments(self, **kwargs) -> list[dict]:
+        if self.list_error is not None:
+            raise self.list_error
+        if self.enrollments is not None:
+            return self.enrollments
+        return [
             {
-                "match_id": "match-1",
-                "source_url": "https://example.test/image.jpg",
-                "source_page": "https://example.test/page",
-                "score": 0.91,
-                "crawled_at": "2026-05-18T00:00:00Z",
-                "image_thumbnail_url": None,
+                "id": "enrollment-1",
+                "embedding_id": "embedding-1",
+                "embedding_model_version": "arcface-r100-v1",
+                "created_at": "2026-05-18T00:00:00Z",
             }
         ]
+
+    async def delete_enrollment(self, **kwargs) -> dict[str, str]:
+        if self.delete_error is not None:
+            raise self.delete_error
+        return {"status": "deleted"}
 
 
 @dataclass
 class FakeMatchesClient:
+    enrollment_result: list[dict] | None = None
     list_result: list[dict] | None = None
     detail_result: dict | None = None
+    enrollment_error: Exception | None = None
     list_error: Exception | None = None
     detail_error: Exception | None = None
+
+    async def list_enrollments(self, **kwargs) -> list[dict]:
+        if self.enrollment_error is not None:
+            raise self.enrollment_error
+        if self.enrollment_result is not None:
+            return self.enrollment_result
+        return [
+            {
+                "id": "enrollment-1",
+                "embedding_id": "embedding-1",
+                "embedding_model_version": "arcface-r100-v1",
+                "created_at": "2026-05-18T00:00:00Z",
+            }
+        ]
 
     async def list_matches(self, **kwargs) -> list[dict]:
         if self.list_error is not None:
             raise self.list_error
-        return self.list_result or [
+        if self.list_result is not None:
+            return self.list_result
+        return [
             {
                 "match_id": "match-1",
                 "source_url": "https://example.test/image.jpg",
@@ -101,87 +121,111 @@ def test_enroll_without_session_returns_login_required(client) -> None:
     assert "Login required" in response.text
 
 
-def test_search_without_session_returns_login_required(client) -> None:
-    response = client.post("/search", files=_files())
-
-    assert response.status_code == 200
-    assert "Login required" in response.text
-
-
-@pytest.mark.parametrize(
-    ("path", "module_name"),
-    [("/enroll", "routers.enroll"), ("/search", "routers.search")],
-)
-def test_liveness_failure_returns_liveness_partial(client, monkeypatch, path, module_name) -> None:
-    module = pytest.importorskip(module_name)
-    fake_client = (
-        FakeEnrollClient(error=_status_error(403, "liveness_failed"))
-        if path == "/enroll"
-        else FakeSearchClient(error=_status_error(403, "liveness_failed"))
+def test_liveness_failure_returns_liveness_partial(client, monkeypatch) -> None:
+    enroll_module = pytest.importorskip("routers.enroll")
+    monkeypatch.setattr(
+        enroll_module,
+        "backend_client",
+        FakeEnrollClient(error=_status_error(403, "liveness_failed")),
     )
-    monkeypatch.setattr(module, "backend_client", fake_client)
     client.cookies.set("session_token", "token")
 
-    response = client.post(path, files=_files())
+    response = client.post("/enroll", files=_files())
 
     assert response.status_code == 200
     assert "Liveness check failed" in response.text
 
 
-@pytest.mark.parametrize(
-    ("path", "module_name"),
-    [("/enroll", "routers.enroll"), ("/search", "routers.search")],
-)
-def test_backend_unavailable_returns_backend_unavailable_partial(
-    client,
-    monkeypatch,
-    path,
-    module_name,
-) -> None:
-    module = pytest.importorskip(module_name)
-    fake_client = (
-        FakeEnrollClient(error=_request_error())
-        if path == "/enroll"
-        else FakeSearchClient(error=_request_error())
-    )
-    monkeypatch.setattr(module, "backend_client", fake_client)
+def test_backend_unavailable_returns_backend_unavailable_partial(client, monkeypatch) -> None:
+    enroll_module = pytest.importorskip("routers.enroll")
+    monkeypatch.setattr(enroll_module, "backend_client", FakeEnrollClient(error=_request_error()))
     client.cookies.set("session_token", "token")
 
-    response = client.post(path, files=_files())
+    response = client.post("/enroll", files=_files())
 
     assert response.status_code == 200
     assert "Service unavailable" in response.text
 
 
-def test_successful_enroll_returns_success_partial(client, monkeypatch) -> None:
+def test_successful_enroll_redirects_to_matches(client, monkeypatch) -> None:
     enroll_module = pytest.importorskip("routers.enroll")
     monkeypatch.setattr(enroll_module, "backend_client", FakeEnrollClient())
     client.cookies.set("session_token", "token")
 
     response = client.post("/enroll", files=_files())
 
+    assert response.status_code == 204
+    assert response.headers["HX-Redirect"] == "/matches"
+
+
+def test_enrollment_limit_reached_returns_limit_partial(client, monkeypatch) -> None:
+    enroll_module = pytest.importorskip("routers.enroll")
+    monkeypatch.setattr(
+        enroll_module,
+        "backend_client",
+        FakeEnrollClient(error=_status_error(409, "enrollment_limit_reached")),
+    )
+    client.cookies.set("session_token", "token")
+
+    response = client.post("/enroll", files=_files())
+
     assert response.status_code == 200
-    assert "Enrollment saved" in response.text
+    assert "Delete an existing enrollment before adding another." in response.text
+
+
+def test_enroll_page_shows_existing_enrollments(client, monkeypatch) -> None:
+    enroll_module = pytest.importorskip("routers.enroll")
+    monkeypatch.setattr(enroll_module, "backend_client", FakeEnrollClient())
+    client.cookies.set("session_token", "token")
+
+    response = client.get("/enroll")
+
+    assert response.status_code == 200
+    assert "Active enrollments" in response.text
     assert "arcface-r100-v1" in response.text
 
 
-def test_successful_search_returns_results_partial(client, monkeypatch) -> None:
-    search_module = pytest.importorskip("routers.search")
-    monkeypatch.setattr(search_module, "backend_client", FakeSearchClient())
+def test_enroll_page_disables_form_at_enrollment_limit(client, monkeypatch) -> None:
+    enroll_module = pytest.importorskip("routers.enroll")
+    enrollments = [
+        {
+            "id": f"enrollment-{index}",
+            "embedding_id": f"embedding-{index}",
+            "embedding_model_version": "arcface-r100-v1",
+            "created_at": "2026-05-18T00:00:00Z",
+        }
+        for index in range(3)
+    ]
+    monkeypatch.setattr(
+        enroll_module,
+        "backend_client",
+        FakeEnrollClient(enrollments=enrollments),
+    )
     client.cookies.set("session_token", "token")
 
-    response = client.post("/search", files=_files())
+    response = client.get("/enroll")
 
     assert response.status_code == 200
-    assert "Potential match" in response.text
-    assert "match-1" in response.text
+    assert "Delete an existing enrollment before adding another." in response.text
+    assert "disabled" in response.text
+
+
+def test_delete_enrollment_redirects_to_enroll(client, monkeypatch) -> None:
+    enroll_module = pytest.importorskip("routers.enroll")
+    monkeypatch.setattr(enroll_module, "backend_client", FakeEnrollClient())
+    client.cookies.set("session_token", "token")
+
+    response = client.post("/enrollments/enrollment-1/delete")
+
+    assert response.status_code == 204
+    assert response.headers["HX-Redirect"] == "/enroll"
 
 
 def test_matches_list_without_session_returns_login_required(client) -> None:
-    response = client.get("/matches")
+    response = client.get("/matches", follow_redirects=False)
 
-    assert response.status_code == 200
-    assert "Login required" in response.text
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"
 
 
 def test_successful_matches_list_returns_matches_page(client, monkeypatch) -> None:
@@ -194,6 +238,21 @@ def test_successful_matches_list_returns_matches_page(client, monkeypatch) -> No
     assert response.status_code == 200
     assert "Potential match" in response.text
     assert "match-1" in response.text
+
+
+def test_matches_list_without_enrollment_shows_setup_state(client, monkeypatch) -> None:
+    matches_module = pytest.importorskip("routers.matches")
+    monkeypatch.setattr(
+        matches_module,
+        "backend_client",
+        FakeMatchesClient(enrollment_result=[], list_result=[]),
+    )
+    client.cookies.set("session_token", "token")
+
+    response = client.get("/matches")
+
+    assert response.status_code == 200
+    assert "Enroll your face first to start monitoring matches." in response.text
 
 
 def test_matches_list_backend_401_returns_login_required(client, monkeypatch) -> None:
