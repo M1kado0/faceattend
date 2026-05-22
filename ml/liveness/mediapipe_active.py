@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,11 @@ import mediapipe as mp
 import numpy as np
 from mediapipe.tasks.python import BaseOptions
 from mediapipe.tasks.python.vision import FaceLandmarker, FaceLandmarkerOptions, RunningMode
+
+# Allow `uv run ml/liveness/mediapipe_active.py` from the repo root while keeping
+# package imports for normal app/test execution.
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from ml.liveness.base import LivenessResult
 from ml.liveness.challenge import ActiveLivenessChallenge
@@ -30,6 +36,10 @@ class ActiveLivenessConfig:
     closed_eye_threshold: float = 0.20
     open_eye_threshold: float = 0.24
     max_faces: int = 1
+    min_closed_frames: int = 2
+    min_open_frames: int = 2
+    blink_cooldown_ms: int = 250
+    max_multiple_face_frame_ratio: float = 0.05
 
 
 @dataclass(frozen=True)
@@ -96,36 +106,82 @@ def _failed(
 
 
 class BlinkCounter:
-    def __init__(self, closed_eye_threshold: float, open_eye_threshold: float) -> None:
+    def __init__(
+        self,
+        closed_eye_threshold: float,
+        open_eye_threshold: float,
+        min_closed_frames: int,
+        min_open_frames: int,
+        blink_cooldown_ms: int,
+    ) -> None:
         self.closed_eye_threshold = closed_eye_threshold
         self.open_eye_threshold = open_eye_threshold
+        self.min_closed_frames = min_closed_frames
+        self.min_open_frames = min_open_frames
+        self.blink_cooldown_ms = blink_cooldown_ms
         self.blinks = 0
-        self._eye_was_closed = False
+        self.state = "OPEN"
+        self.closed_frame_count = 0
+        self.open_frame_count = 0
+        self.last_blink_timestamp_ms: int | None = None
 
-    def observe(self, eye_aspect_ratio: float) -> None:
-        if eye_aspect_ratio <= self.closed_eye_threshold:
-            self._eye_was_closed = True
+    def observe(self, eye_aspect_ratio: float, timestamp_ms: int) -> None:
+        if self.state in {"OPEN", "CLOSED_CANDIDATE"}:
+            if eye_aspect_ratio <= self.closed_eye_threshold:
+                self.closed_frame_count += 1
+                self.state = "CLOSED_CANDIDATE"
+
+                if self.closed_frame_count >= self.min_closed_frames:
+                    self.state = "CLOSED"
+                    self.open_frame_count = 0
+                return
+
+            self.closed_frame_count = 0
+            self.state = "OPEN"
             return
-        if self._eye_was_closed and eye_aspect_ratio >= self.open_eye_threshold:
+
+        if self.state in {"CLOSED", "OPEN_CANDIDATE"}:
+            if eye_aspect_ratio >= self.open_eye_threshold:
+                self.open_frame_count += 1
+                self.state = "OPEN_CANDIDATE"
+
+                if self.open_frame_count >= self.min_open_frames:
+                    self._count_blink_if_allowed(timestamp_ms)
+                    self._reset_after_blink()
+                return
+
+            self.open_frame_count = 0
+            self.state = "CLOSED"
+
+    def _count_blink_if_allowed(self, timestamp_ms: int) -> None:
+        if (
+            self.last_blink_timestamp_ms is None
+            or timestamp_ms - self.last_blink_timestamp_ms >= self.blink_cooldown_ms
+        ):
             self.blinks += 1
-            self._eye_was_closed = False
+            self.last_blink_timestamp_ms = timestamp_ms
+
+    def _reset_after_blink(self) -> None:
+        self.state = "OPEN"
+        self.closed_frame_count = 0
+        self.open_frame_count = 0
 
 
 def _average_eye_aspect_ratio(face_landmarks: list) -> float:
     left = _eye_aspect_ratio(face_landmarks, LEFT_EYE)
     right = _eye_aspect_ratio(face_landmarks, RIGHT_EYE)
-    return (left + right) / 2.0
+    return (left + right) / 2
 
 
 def _eye_aspect_ratio(
     face_landmarks: list, eye_indices: tuple[int, int, int, int, int, int]
 ) -> float:
-    p1, p2, p3, p4, p5, p6 = [_landmark_xy(face_landmarks[index]) for index in eye_indices]
+    p1, p2, p3, p4, p5, p6 = [_landmark_xy(face_landmarks[i]) for i in eye_indices]
     vertical = np.linalg.norm(p2 - p6) + np.linalg.norm(p3 - p5)
     horizontal = 2.0 * np.linalg.norm(p1 - p4)
     if horizontal == 0:
         return 0.0
-    return float(vertical / horizontal)
+    return vertical / horizontal
 
 
 def _landmark_xy(landmark) -> np.ndarray:
@@ -151,28 +207,55 @@ class MediaPipeActiveLivenessChecker:
             challenge = ActiveLivenessChallenge(challenge)
         except ValueError as exc:
             return _failed(
-                "unsupported_challenge", score=0.0, challenge_completed=False, reason=str(exc)
+                "unsupported_challenge",
+                score=0.0,
+                reason=str(exc),
+                challenge_completed=False,
             )
-
         try:
             frames, duration_seconds = _decode_video(video)
         except VideoDecodeError as exc:
             return _failed(
-                "video_decode_failed", score=0.0, challenge_completed=False, reason=str(exc)
+                "video_decode_failed",
+                score=0.0,
+                reason=str(exc),
+                challenge_completed=False,
             )
-
         duration_result = self._validate_duration(duration_seconds)
         if duration_result is not None:
             return duration_result
 
-        blink_result = self._check_blink_twice(frames)
-        passed = blink_result.challenge_completed
-        return LivenessResult(
-            passed=passed,
-            score=blink_result.score,
-            label=ActiveLivenessChallenge.BLINK_TWICE.value,
-            reason=None if passed else blink_result.reason,
-            challenge_completed=blink_result.challenge_completed,
+        try:
+            if challenge == ActiveLivenessChallenge.BLINK_TWICE:
+                blink_result = self._check_blink_twice(frames)
+                passed = blink_result.challenge_completed
+                return LivenessResult(
+                    passed=passed,
+                    score=blink_result.score,
+                    label=challenge.value,
+                    reason=None if passed else blink_result.reason,
+                    challenge_completed=blink_result.challenge_completed,
+                )
+        except FileNotFoundError as exc:
+            return _failed(
+                "model_not_found",
+                score=0.0,
+                reason=str(exc),
+                challenge_completed=False,
+            )
+        except ValueError as exc:
+            return _failed(
+                "unsupported_challenge",
+                score=0.0,
+                reason=str(exc),
+                challenge_completed=False,
+            )
+
+        return _failed(
+            "unsupported_challenge",
+            score=0.0,
+            challenge_completed=False,
+            reason=f"challenge={challenge.value}",
         )
 
     def _validate_duration(self, duration_seconds: float) -> LivenessResult | None:
@@ -180,15 +263,15 @@ class MediaPipeActiveLivenessChecker:
             return _failed(
                 "video_too_short",
                 score=0.0,
-                challenge_completed=False,
                 reason=f"duration_seconds={duration_seconds:.2f}",
+                challenge_completed=False,
             )
         if duration_seconds > self.config.max_seconds:
             return _failed(
                 "video_too_long",
                 score=0.0,
-                challenge_completed=False,
                 reason=f"duration_seconds={duration_seconds:.2f}",
+                challenge_completed=False,
             )
         return None
 
@@ -211,37 +294,53 @@ class MediaPipeActiveLivenessChecker:
 
     def _check_blink_twice(self, frames: list[VideoFrame]) -> LivenessResult:
         if not frames:
-            return _failed("no_video_frames", score=0.0, challenge_completed=False)
+            return _failed(
+                "no_video_frames",
+                score=0.0,
+                challenge_completed=False,
+            )
         blink_counter = BlinkCounter(
-            self.config.closed_eye_threshold, self.config.open_eye_threshold
+            self.config.closed_eye_threshold,
+            self.config.open_eye_threshold,
+            self.config.min_closed_frames,
+            self.config.min_open_frames,
+            self.config.blink_cooldown_ms,
         )
+
         face_frames = 0
         multiple_face_frames = 0
         for frame in frames:
             result = self._landmarker_instance().detect_for_video(
-                mp.Image(image_format=mp.ImageFormat.SRGB, data=frame.image_rgb), frame.timestamp_ms
+                mp.Image(image_format=mp.ImageFormat.SRGB, data=frame.image_rgb),
+                frame.timestamp_ms,
             )
             face_count = len(result.face_landmarks)
             if face_count == 0:
                 continue
-            if face_count > self.config.max_faces:
+            if face_count > 1:
                 multiple_face_frames += 1
                 continue
 
             face_frames += 1
             ear = _average_eye_aspect_ratio(result.face_landmarks[0])
-            blink_counter.observe(ear)
+            blink_counter.observe(ear, frame.timestamp_ms)
 
-        if multiple_face_frames:
-            return _failed("multiple_faces_detected", score=0.0, challenge_completed=False)
+        multiple_face_ratio = multiple_face_frames / len(frames)
+        if multiple_face_ratio > self.config.max_multiple_face_frame_ratio:
+            return _failed(
+                "multiple_faces_detected",
+                score=0.0,
+                challenge_completed=False,
+            )
 
         face_frame_ratio = face_frames / len(frames)
         if face_frame_ratio < self.config.min_face_frame_ratio:
             return _failed(
                 "face_not_visible_enough",
-                score=face_frame_ratio,
+                score=0.0,
                 challenge_completed=False,
             )
+
         blink_score = min(blink_counter.blinks / self.config.min_blinks, 1.0)
         challenge_completed = blink_counter.blinks >= self.config.min_blinks
         return LivenessResult(
