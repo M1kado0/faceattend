@@ -1,14 +1,26 @@
-"""/settings — account settings + GDPR controls."""
+"""/settings — account settings + attendance privacy controls."""
+
+from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 router = APIRouter()
+
+ROOT = Path(__file__).resolve().parents[1]
+
+templates = Jinja2Templates(
+    directory=ROOT / "templates",
+)
 
 
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
-    raise NotImplementedError
+    return templates.TemplateResponse(
+        request=request,
+        name="pages/settings.html",
+    )
 
 
 # GDPR: right to portability

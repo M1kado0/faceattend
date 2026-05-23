@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from routers import auth, billing, enroll, matches, settings  # noqa: E402
+from routers import attendance, auth, billing, face_registrations, settings  # noqa: E402
 
 app = FastAPI(title="FaceAttend — Public Site", version="0.1.0")
 
@@ -23,6 +23,7 @@ templates = Jinja2Templates(
     directory=ROOT / "templates",
 )
 
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(
@@ -30,8 +31,37 @@ async def index(request: Request):
         name="pages/index.html",
     )
 
+
+@app.get("/sessions", response_class=HTMLResponse)
+async def sessions_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="pages/sessions.html",
+        context={
+            "sessions": [
+                {
+                    "id": "session-demo",
+                    "name": "Demo Attendance Session",
+                    "time": "Today",
+                    "status": "Open",
+                    "present": 0,
+                    "expected": 0,
+                }
+            ]
+        },
+    )
+
+
+@app.get("/reports", response_class=HTMLResponse)
+async def reports_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="pages/reports.html",
+    )
+
+
 app.include_router(auth.router, tags=["auth"])
-app.include_router(enroll.router, tags=["enroll"])
-app.include_router(matches.router, tags=["matches"])
+app.include_router(face_registrations.router, tags=["face-registrations"])
+app.include_router(attendance.router, tags=["attendance"])
 app.include_router(settings.router, tags=["settings"])
 app.include_router(billing.router, tags=["billing"])

@@ -3,10 +3,11 @@
 from fastapi import FastAPI
 
 from backend.api.routes import (
+    attendance_records,
     auth,
     billing,
-    enroll,
-    matches,
+    check_ins,
+    face_registrations,
     notifications,
     users,
 )
@@ -21,8 +22,17 @@ app = FastAPI(
 
 app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
 app.include_router(users.router, prefix="/v1/users", tags=["users"])
-app.include_router(enroll.router, prefix="/v1", tags=["enroll"])
-app.include_router(matches.router, prefix="/v1/matches", tags=["matches"])
+app.include_router(
+    face_registrations.router,
+    prefix="/v1/face-registrations",
+    tags=["face-registrations"],
+)
+app.include_router(
+    attendance_records.router,
+    prefix="/v1/attendance-records",
+    tags=["attendance-records"],
+)
+app.include_router(check_ins.router, prefix="/v1", tags=["check-ins"])
 app.include_router(notifications.router, prefix="/v1/notifications", tags=["notifications"])
 app.include_router(billing.router, prefix="/v1/webhooks", tags=["billing"])
 

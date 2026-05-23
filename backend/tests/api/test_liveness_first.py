@@ -9,11 +9,11 @@ import pytest
 from starlette.datastructures import UploadFile
 
 from backend.api.ml_client import EmbeddingResult, LivenessCheck
-from backend.api.routes import enroll as enroll_module
-from backend.api.routes import search as search_module
-from backend.api.services import match_scan as match_scan_module
-from backend.db.models.enrollment import Enrollment
-from backend.db.models.match import MatchRow
+from backend.api.routes import check_ins as check_in_module
+from backend.api.routes import face_registrations as face_registration_module
+from backend.api.services import attendance_record_scan as attendance_record_scan_module
+from backend.db.models.attendance_record import AttendanceRecordRow
+from backend.db.models.face_registration import FaceRegistration
 from backend.db.models.user import User
 from backend.indexer.store import Match
 
@@ -91,7 +91,7 @@ class RecordingIndex:
         self.searched.append((embedding, top_k, filter))
         return [
             Match(
-                embedding_id="match-1",
+                embedding_id="registration-1",
                 score=0.9,
                 metadata={
                     "source_url": "https://example.test/image.jpg",
@@ -118,7 +118,9 @@ def user() -> User:
 
 
 @pytest.mark.asyncio
-async def test_enroll_rejects_failed_liveness_before_embedding(monkeypatch, user) -> None:
+async def test_face_registration_rejects_failed_liveness_before_embedding(
+    monkeypatch, user
+) -> None:
     calls = []
 
     async def fake_log(**kwargs) -> None:
@@ -131,24 +133,24 @@ async def test_enroll_rejects_failed_liveness_before_embedding(monkeypatch, user
     async def fake_embed(**kwargs) -> EmbeddingResult:
         raise AssertionError("embedding must not run after failed liveness")
 
-    monkeypatch.setattr(enroll_module, "log", fake_log)
-    monkeypatch.setattr(enroll_module, "verify_passive_liveness", fake_liveness)
-    monkeypatch.setattr(enroll_module, "embed_image", fake_embed)
+    monkeypatch.setattr(face_registration_module, "log", fake_log)
+    monkeypatch.setattr(face_registration_module, "verify_passive_liveness", fake_liveness)
+    monkeypatch.setattr(face_registration_module, "embed_image", fake_embed)
 
     session = FakeSession()
     with pytest.raises(Exception) as exc_info:
-        await enroll_module.enroll(
+        await face_registration_module.create_face_registration(
             photo=_upload("photo.jpg"),
             liveness_blob=_upload("live.jpg"),
             user=user,
-            session=session
+            session=session,
         )
 
     assert exc_info.value.status_code == 403
     assert calls == [
-        ("log", "enroll.attempt"),
+        ("log", "face_registration.attempt"),
         ("liveness", "live.jpg"),
-        ("log", "enroll.liveness_failed"),
+        ("log", "face_registration.liveness_failed"),
     ]
 
 
@@ -171,22 +173,19 @@ async def test_enroll_indexes_only_after_passed_liveness(monkeypatch, user) -> N
             model_version="arcface-r100-v1",
         )
 
-    monkeypatch.setattr(enroll_module, "log", fake_log)
-    monkeypatch.setattr(enroll_module, "verify_passive_liveness", fake_liveness)
-    monkeypatch.setattr(enroll_module, "embed_image", fake_embed)
-    monkeypatch.setattr(enroll_module, "index", index)
-    monkeypatch.setattr(match_scan_module, "log", fake_log)
-    monkeypatch.setattr(match_scan_module, "index", index)
+    monkeypatch.setattr(face_registration_module, "log", fake_log)
+    monkeypatch.setattr(face_registration_module, "verify_passive_liveness", fake_liveness)
+    monkeypatch.setattr(face_registration_module, "embed_image", fake_embed)
+    monkeypatch.setattr(face_registration_module, "index", index)
+    monkeypatch.setattr(attendance_record_scan_module, "log", fake_log)
+    monkeypatch.setattr(attendance_record_scan_module, "index", index)
 
     session = FakeSession()
-    response = await enroll_module.enroll(
-        photo=_upload("photo.jpg"),
-        liveness_blob=_upload("live.jpg"),
-        user=user,
-        session=session
+    response = await face_registration_module.create_face_registration(
+        photo=_upload("photo.jpg"), liveness_blob=_upload("live.jpg"), user=user, session=session
     )
     assert len(session.added) == 2
-    enrollment = next(obj for obj in session.added if isinstance(obj, Enrollment))
+    face_registration = next(obj for obj in session.added if isinstance(obj, FaceRegistration))
 
     assert response.embedding_model_version == "arcface-r100-v1"
     assert index.added[0][2] == {
@@ -194,23 +193,25 @@ async def test_enroll_indexes_only_after_passed_liveness(monkeypatch, user) -> N
         "embedding_model_version": "arcface-r100-v1",
     }
     assert calls[:3] == [
-        ("log", "enroll.attempt"),
+        ("log", "face_registration.attempt"),
         ("liveness", "live.jpg"),
         ("embed", "photo.jpg"),
     ]
 
-    assert enrollment.user_id == "user-1"
-    assert enrollment.embedding_model_version == "arcface-r100-v1"
-    assert enrollment.embedding_id == index.added[0][0]
-    assert response.enrollment_id == enrollment.id
+    assert face_registration.user_id == "user-1"
+    assert face_registration.embedding_model_version == "arcface-r100-v1"
+    assert face_registration.embedding_id == index.added[0][0]
+    assert response.registration_id == face_registration.id
 
 
 @pytest.mark.asyncio
-async def test_enroll_rejects_when_enrollment_limit_reached(monkeypatch, user) -> None:
+async def test_face_registration_rejects_when_face_registration_limit_reached(
+    monkeypatch, user
+) -> None:
     logs = []
-    existing_enrollments = [
-        Enrollment(
-            id=f"enrollment-{index}",
+    existing_face_registrations = [
+        FaceRegistration(
+            id=f"face_registration-{index}",
             user_id=user.id,
             embedding_id=f"embedding-{index}",
             embedding_model_version="arcface-r100-v1",
@@ -222,14 +223,14 @@ async def test_enroll_rejects_when_enrollment_limit_reached(monkeypatch, user) -
         logs.append(kwargs["action"])
 
     async def fake_liveness(**kwargs) -> LivenessCheck:
-        raise AssertionError("liveness must not run when enrollment limit is reached")
+        raise AssertionError("liveness must not run when face registration limit is reached")
 
-    monkeypatch.setattr(enroll_module, "log", fake_log)
-    monkeypatch.setattr(enroll_module, "verify_passive_liveness", fake_liveness)
+    monkeypatch.setattr(face_registration_module, "log", fake_log)
+    monkeypatch.setattr(face_registration_module, "verify_passive_liveness", fake_liveness)
 
-    session = FakeSession(execute_results=[FakeExecuteResult(rows=existing_enrollments)])
+    session = FakeSession(execute_results=[FakeExecuteResult(rows=existing_face_registrations)])
     with pytest.raises(Exception) as exc_info:
-        await enroll_module.enroll(
+        await face_registration_module.create_face_registration(
             photo=_upload("photo.jpg"),
             liveness_blob=_upload("live.jpg"),
             user=user,
@@ -237,70 +238,70 @@ async def test_enroll_rejects_when_enrollment_limit_reached(monkeypatch, user) -
         )
 
     assert exc_info.value.status_code == 409
-    assert exc_info.value.detail == "enrollment_limit_reached"
-    assert logs == ["enroll.attempt", "enroll.limit_reached"]
+    assert exc_info.value.detail == "face_registration_limit_reached"
+    assert logs == ["face_registration.attempt", "face_registration.limit_reached"]
 
 
 @pytest.mark.asyncio
-async def test_list_enrollments_returns_current_user_enrollments(user) -> None:
-    enrollment = Enrollment(
-        id="enrollment-1",
+async def test_list_face_registrations_returns_current_user_registrations(user) -> None:
+    face_registration = FaceRegistration(
+        id="face_registration-1",
         user_id=user.id,
         embedding_id="embedding-1",
         embedding_model_version="arcface-r100-v1",
     )
-    session = FakeSession(execute_results=[FakeExecuteResult(rows=[enrollment])])
+    session = FakeSession(execute_results=[FakeExecuteResult(rows=[face_registration])])
 
-    response = await enroll_module.list_enrollments(user=user, session=session)
+    response = await face_registration_module.list_face_registrations(user=user, session=session)
 
     assert response == [
         {
-            "id": "enrollment-1",
+            "id": "face_registration-1",
             "embedding_id": "embedding-1",
             "embedding_model_version": "arcface-r100-v1",
-            "created_at": enrollment.created_at,
+            "created_at": face_registration.created_at,
         }
     ]
     assert len(session.executed) == 1
 
 
 @pytest.mark.asyncio
-async def test_delete_enrollment_deletes_index_and_db_row(monkeypatch, user) -> None:
+async def test_delete_face_registration_deletes_index_and_db_row(monkeypatch, user) -> None:
     logs = []
     index = RecordingIndex(added=[], searched=[])
-    enrollment = Enrollment(
-        id="enrollment-1",
+    face_registration = FaceRegistration(
+        id="face_registration-1",
         user_id=user.id,
         embedding_id="embedding-1",
         embedding_model_version="arcface-r100-v1",
     )
-    session = FakeSession(execute_results=[FakeExecuteResult(one=enrollment)])
+    session = FakeSession(execute_results=[FakeExecuteResult(one=face_registration)])
 
     async def fake_log(**kwargs) -> None:
         logs.append(kwargs)
 
-    monkeypatch.setattr(enroll_module, "log", fake_log)
-    monkeypatch.setattr(enroll_module, "index", index)
+    monkeypatch.setattr(face_registration_module, "log", fake_log)
+    monkeypatch.setattr(face_registration_module, "index", index)
 
-    response = await enroll_module.delete_enrollment(
-        enrollment_id="enrollment-1",
+    response = await face_registration_module.delete_face_registration(
+        registration_id="face_registration-1",
         user=user,
         session=session,
     )
 
     assert response == {"status": "deleted"}
     assert index.deleted == ["embedding-1"]
-    assert session.deleted == [enrollment]
+    assert session.deleted == [face_registration]
     assert session.commit_count == 1
     assert session.rollback_count == 0
     assert [entry["action"] for entry in logs] == [
-        "enroll.delete.attempt",
-        "enroll.delete.success",
+        "face_registration.delete.attempt",
+        "face_registration.delete.success",
     ]
 
 
 @pytest.mark.asyncio
-async def test_delete_enrollment_returns_404_when_missing(monkeypatch, user) -> None:
+async def test_delete_face_registration_returns_404_when_missing(monkeypatch, user) -> None:
     logs = []
     index = RecordingIndex(added=[], searched=[])
     session = FakeSession(execute_results=[FakeExecuteResult(one=None)])
@@ -308,29 +309,29 @@ async def test_delete_enrollment_returns_404_when_missing(monkeypatch, user) -> 
     async def fake_log(**kwargs) -> None:
         logs.append(kwargs)
 
-    monkeypatch.setattr(enroll_module, "log", fake_log)
-    monkeypatch.setattr(enroll_module, "index", index)
+    monkeypatch.setattr(face_registration_module, "log", fake_log)
+    monkeypatch.setattr(face_registration_module, "index", index)
 
     with pytest.raises(Exception) as exc_info:
-        await enroll_module.delete_enrollment(
-            enrollment_id="missing-enrollment",
+        await face_registration_module.delete_face_registration(
+            registration_id="missing-registration",
             user=user,
             session=session,
         )
 
     assert exc_info.value.status_code == 404
-    assert exc_info.value.detail == "enrollment_not_found"
+    assert exc_info.value.detail == "face_registration_not_found"
     assert index.deleted == []
     assert session.deleted == []
     assert session.commit_count == 0
     assert [entry["action"] for entry in logs] == [
-        "enroll.delete.attempt",
-        "enroll.delete.not_found",
+        "face_registration.delete.attempt",
+        "face_registration.delete.not_found",
     ]
 
 
 @pytest.mark.asyncio
-async def test_search_filters_by_embedding_model_after_liveness(monkeypatch, user) -> None:
+async def test_check_in_filters_by_embedding_model_after_liveness(monkeypatch, user) -> None:
     index = RecordingIndex(added=[], searched=[])
 
     async def fake_log(**kwargs) -> None:
@@ -345,14 +346,14 @@ async def test_search_filters_by_embedding_model_after_liveness(monkeypatch, use
             model_version="arcface-r100-v1",
         )
 
-    monkeypatch.setattr(search_module, "log", fake_log)
-    monkeypatch.setattr(search_module, "verify_passive_liveness", fake_liveness)
-    monkeypatch.setattr(search_module, "embed_image", fake_embed)
-    monkeypatch.setattr(match_scan_module, "log", fake_log)
-    monkeypatch.setattr(match_scan_module, "index", index)
+    monkeypatch.setattr(check_in_module, "log", fake_log)
+    monkeypatch.setattr(check_in_module, "verify_passive_liveness", fake_liveness)
+    monkeypatch.setattr(check_in_module, "embed_image", fake_embed)
+    monkeypatch.setattr(attendance_record_scan_module, "log", fake_log)
+    monkeypatch.setattr(attendance_record_scan_module, "index", index)
 
     session = FakeSession()
-    response = await search_module.search(
+    response = await check_in_module.check_in(
         photo=_upload("photo.jpg"),
         liveness_blob=_upload("live.jpg"),
         user=user,
@@ -360,25 +361,23 @@ async def test_search_filters_by_embedding_model_after_liveness(monkeypatch, use
     )
 
     assert len(session.added) == 1
-    match_row = session.added[0]
-    assert response.matches[0].match_id == match_row.id
-    assert match_row.user_id == user.id
-    assert match_row.image_id == "match-1"
+    attendance_record = session.added[0]
+    assert response.attendance_records[0].record_id == attendance_record.id
+    assert attendance_record.user_id == user.id
+    assert attendance_record.face_registration_id == "registration-1"
     assert session.commit_count == 1
     assert index.searched[0][2] == {"embedding_model_version": "arcface-r100-v1"}
 
 
 @pytest.mark.asyncio
-async def test_search_reuses_existing_persisted_match(monkeypatch, user) -> None:
+async def test_check_in_reuses_existing_persisted_match(monkeypatch, user) -> None:
     index = RecordingIndex(added=[], searched=[])
-    existing_match = MatchRow(
-        id="persisted-match-1",
+    existing_record = AttendanceRecordRow(
+        id="persisted-record-1",
         user_id=user.id,
-        image_id="match-1",
-        source_url="https://example.test/image.jpg",
-        source_page="https://example.test/page",
+        face_registration_id="registration-1",
         score=0.9,
-        crawled_at=datetime.utcnow(),
+        checked_in_at=datetime.utcnow(),
         created_at=datetime.utcnow(),
     )
 
@@ -394,14 +393,14 @@ async def test_search_reuses_existing_persisted_match(monkeypatch, user) -> None
             model_version="arcface-r100-v1",
         )
 
-    monkeypatch.setattr(search_module, "log", fake_log)
-    monkeypatch.setattr(search_module, "verify_passive_liveness", fake_liveness)
-    monkeypatch.setattr(search_module, "embed_image", fake_embed)
-    monkeypatch.setattr(match_scan_module, "log", fake_log)
-    monkeypatch.setattr(match_scan_module, "index", index)
+    monkeypatch.setattr(check_in_module, "log", fake_log)
+    monkeypatch.setattr(check_in_module, "verify_passive_liveness", fake_liveness)
+    monkeypatch.setattr(check_in_module, "embed_image", fake_embed)
+    monkeypatch.setattr(attendance_record_scan_module, "log", fake_log)
+    monkeypatch.setattr(attendance_record_scan_module, "index", index)
 
-    session = FakeSession(execute_results=[FakeExecuteResult(rows=[existing_match])])
-    response = await search_module.search(
+    session = FakeSession(execute_results=[FakeExecuteResult(rows=[existing_record])])
+    response = await check_in_module.check_in(
         photo=_upload("photo.jpg"),
         liveness_blob=_upload("live.jpg"),
         user=user,
@@ -410,5 +409,5 @@ async def test_search_reuses_existing_persisted_match(monkeypatch, user) -> None
 
     assert session.added == []
     assert session.commit_count == 0
-    assert response.matches[0].match_id == "persisted-match-1"
-    assert response.matches[0].score == 0.9
+    assert response.attendance_records[0].record_id == "persisted-record-1"
+    assert response.attendance_records[0].score == 0.9

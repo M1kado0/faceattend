@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Register Face | FaceAttend{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold">Register face</h1>
+        <p class="text-base-content/70 mt-2">
+            Add a verified face template before using attendance check-in.
+        </p>
+    </div>
+
+    {% set registration_count = face_registrations|length %}
+    {% set can_register = registration_count < max_active_face_registrations %}
+
+    {% if face_registrations %}
+    <div class="mb-6">
+        <h2 class="mb-3 text-lg font-semibold">Registered face templates</h2>
+        <ul class="space-y-3">
+            {% for registration in face_registrations %}
+            <li class="flex items-center justify-between gap-4 rounded border border-base-300 bg-base-100 p-4">
+                <div class="min-w-0 text-sm">
+                    <p class="font-medium">Face registration {{ loop.index }}</p>
+                    <p class="break-all text-base-content/70">
+                        {{ registration.embedding_model_version }}
+                    </p>
+                    <p class="text-base-content/60">{{ registration.created_at }}</p>
+                </div>
+                <form
+                    hx-post="/face-registrations/{{ registration.id }}/delete"
+                    hx-target="#face-registration-result"
+                    hx-swap="innerHTML"
+                >
+                    <button type="submit" class="btn btn-outline btn-error btn-sm">
+                        Delete
+                    </button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if not can_register %}
+    <div role="alert" class="alert mb-6">
+        <span>Delete an existing face registration before adding another.</span>
+    </div>
+    {% endif %}
+
+    <div class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
+        <div class="mb-5">
+            <h2 class="text-lg font-semibold">Challenge: Blink twice</h2>
+            <p class="mt-2 text-sm text-base-content/70">
+                FaceAttend records a short webcam video, verifies active liveness, then uses a valid frame from that same video for registration.
+            </p>
+        </div>
+
+        <div class="aspect-video overflow-hidden rounded-lg bg-base-300">
+            <video
+                id="webcam-preview"
+                class="h-full w-full object-cover"
+                autoplay
+                muted
+                playsinline
+            ></video>
+        </div>
+
+        <div class="mt-5 flex flex-wrap items-center gap-3">
+            <button
+                type="button"
+                class="btn btn-primary"
+                {% if not can_register %}disabled{% endif %}
+                onclick="window.startLivenessCapture('/face-registrations', null, { fieldName: 'liveness_video', targetId: 'face-registration-result', durationMs: 4000 })"
+            >
+                Start registration
+            </button>
+            <span class="text-sm text-base-content/60">Recording length: 4 seconds</span>
+        </div>
+
+        <div id="face-registration-result" class="mt-6"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/webcam.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Check In | FaceAttend{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-4xl">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold">Check in</h1>
+        <p class="mt-2 text-base-content/70">
+            Verify liveness with a blink challenge before FaceAttend records attendance.
+        </p>
+    </div>
+
+    {% if not has_registration %}
+    <div role="alert" class="alert mb-6">
+        <span>Register your face before checking in.</span>
+        <a href="/face-registration" class="btn btn-primary btn-sm">Register face</a>
+    </div>
+    {% endif %}
+
+    <div class="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+        <section class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
+            <h2 class="text-lg font-semibold">Blink challenge</h2>
+            <p class="mt-2 text-sm text-base-content/70">
+                The production flow will record a short webcam clip, verify blink-twice liveness, then run face recognition for the selected session.
+            </p>
+
+            <div class="mt-5 aspect-video overflow-hidden rounded-lg bg-base-300">
+                <video
+                    id="webcam-preview"
+                    class="h-full w-full object-cover"
+                    autoplay
+                    muted
+                    playsinline
+                ></video>
+            </div>
+
+            <div class="mt-5 flex flex-wrap gap-3">
+                <button class="btn btn-primary" type="button" disabled>
+                    Start check-in
+                </button>
+                <a href="/attendance" class="btn btn-outline">View results</a>
+            </div>
+            <p class="mt-3 text-xs text-base-content/60">
+                The active liveness backend is ready; the check-in API endpoint still needs to be connected.
+            </p>
+        </section>
+
+        <aside class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
+            <h2 class="text-lg font-semibold">Selected session</h2>
+            <dl class="mt-4 space-y-3 text-sm">
+                <div>
+                    <dt class="font-medium text-base-content/70">Session</dt>
+                    <dd>Demo Attendance Session</dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-base-content/70">Challenge</dt>
+                    <dd>blink_twice</dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-base-content/70">Required checks</dt>
+                    <dd>Active liveness, passive liveness, face recognition</dd>
+                </div>
+            </dl>
+        </aside>
+    </div>
+</div>
+{% endblock %}

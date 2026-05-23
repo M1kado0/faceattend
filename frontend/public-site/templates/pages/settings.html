@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Settings | FaceAttend{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold">Settings</h1>
+        <p class="mt-2 text-base-content/70">
+            Manage attendance privacy, face registration, and account controls.
+        </p>
+    </div>
+
+    <div class="space-y-4">
+        <section class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
+            <h2 class="text-lg font-semibold">Biometric data</h2>
+            <p class="mt-2 text-sm text-base-content/70">
+                FaceAttend stores face templates for attendance recognition. Raw biometric data should not be logged or exposed.
+            </p>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <a href="/face-registration" class="btn btn-outline btn-sm">Manage face registration</a>
+                <button class="btn btn-outline btn-sm" type="button" disabled>Export account data</button>
+            </div>
+        </section>
+
+        <section class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
+            <h2 class="text-lg font-semibold">Attendance roles</h2>
+            <p class="mt-2 text-sm text-base-content/70">
+                Student, instructor, and admin role controls will live here after backend RBAC is connected.
+            </p>
+        </section>
+    </div>
+</div>
+{% endblock %}

@@ -37,41 +37,41 @@ class UserOut(BaseModel):
     created_at: datetime
 
 
-# --- Enroll / Search ---
+# --- Face registration / Attendance ---
 
 
-class EnrollResponse(BaseModel):
-    enrollment_id: str
+class FaceRegistrationResponse(BaseModel):
+    registration_id: str
     embedding_model_version: str
 
 
-class Match(BaseModel):
-    match_id: str
-    source_url: str
-    source_page: str
+class AttendanceRecord(BaseModel):
+    record_id: str
+    face_registration_id: str
+    session_id: str | None = None
     score: float
-    crawled_at: datetime
+    checked_in_at: datetime
     created_at: datetime
     image_thumbnail_url: str | None = None
 
 
-class SearchResponse(BaseModel):
+class CheckInResponse(BaseModel):
     query_id: str
-    matches: list[Match]
+    attendance_records: list[AttendanceRecord]
 
 
-# --- Takedown ---
+# --- Attendance review ---
 
 
-class TakedownRequest(BaseModel):
-    match_id: str
-    notice_type: Literal["dmca", "gdpr_erasure", "platform_tos"]
+class AttendanceReviewRequest(BaseModel):
+    attendance_record_id: str
+    reason: Literal["manual_review", "false_match", "liveness_failure"]
 
 
-class TakedownOut(BaseModel):
+class AttendanceReviewOut(BaseModel):
     id: str
-    match_id: str
-    status: Literal["pending", "sent", "resolved", "rejected"]
+    attendance_record_id: str
+    status: Literal["pending", "approved", "rejected"]
     created_at: datetime
     updated_at: datetime
 

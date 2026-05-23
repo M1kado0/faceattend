@@ -6,8 +6,11 @@
         <div class="flex-none">
             <ul class="menu menu-horizontal px-1">
                 {% if request.cookies.get("session_token") %}
-                <li><a href="/enroll">Enroll</a></li>
-                <li><a href="/matches">Matches</a></li>
+                <li><a href="/check-in">Check In</a></li>
+                <li><a href="/face-registration">Register Face</a></li>
+                <li><a href="/sessions">Sessions</a></li>
+                <li><a href="/attendance">Results</a></li>
+                <li><a href="/reports">Reports</a></li>
                 <li><a href="/settings">Settings</a></li>
                 <li>
                     <form method="post" action="/logout">

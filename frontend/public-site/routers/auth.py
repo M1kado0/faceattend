@@ -65,7 +65,7 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
             status_code=503,
         )
 
-    return _redirect_with_session_token("/enroll", token_pair["access_token"])
+    return _redirect_with_session_token("/check-in", token_pair["access_token"])
 
 
 @router.get("/register", response_class=HTMLResponse)
@@ -98,7 +98,7 @@ async def register(request: Request, email: str = Form(...), password: str = For
             status_code=503,
         )
 
-    return _redirect_with_session_token("/enroll", token_pair["access_token"])
+    return _redirect_with_session_token("/face-registration", token_pair["access_token"])
 
 
 @router.post("/logout")
@@ -106,6 +106,7 @@ async def logout():
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie(SESSION_COOKIE_NAME)
     return response
+
 
 @router.get("/verify", response_class=HTMLResponse)
 async def verify(request: Request, token: str):

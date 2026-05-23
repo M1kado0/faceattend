@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Record | FaceAttend{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold">Attendance record</h1>
+        <p class="mt-2 break-all text-base-content/70">
+            {{ attendance_record.record_id }}
+        </p>
+    </div>
+    <div class="mb-6">
+        <dt class="font-medium text-base-content/70">Recognition confidence</dt>
+        <dd>{{ "%.3f"|format(attendance_record.score) }}</dd>
+    </div>
+    <div class="mb-6">
+        <dt class="font-medium text-base-content/70">Record ID</dt>
+        <dd class="break-all">{{ attendance_record.record_id }}</dd>
+    </div>
+    <div class="mb-6">
+        <dt class="font-medium text-base-content/70">Session</dt>
+        <dd class="break-all">{{ attendance_record.session_id or "Default session" }}</dd>
+    </div>
+    {% if attendance_record.checked_in_at %}
+    <div class="mb-6">
+        <dt class="font-medium text-base-content/70">Checked in at</dt>
+        <dd class="break-all">{{ attendance_record.checked_in_at }}</dd>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

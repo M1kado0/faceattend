@@ -1,13 +1,43 @@
 {% extends "base.html" %}
+
 {% block title %}FaceAttend{% endblock %}
+
 {% block content %}
-<div class="hero min-h-[60vh]">
-    <div class="hero-content text-center">
-        <div class="max-w-md">
-            <h1 class="text-5xl font-bold">FaceAttend</h1>
-            <p class="py-6">Find where your face appears across the public internet. Request takedowns. Stay in control.</p>
-            <a href="/register" class="btn btn-primary">Get started</a>
+<section class="grid min-h-[70vh] items-center gap-8 py-10 lg:grid-cols-[1.1fr_0.9fr]">
+    <div>
+        <div class="badge badge-primary badge-outline mb-4">Active liveness attendance</div>
+        <h1 class="max-w-3xl text-4xl font-bold tracking-tight md:text-5xl">
+            Face attendance with verified check-ins.
+        </h1>
+        <p class="mt-5 max-w-2xl text-lg text-base-content/70">
+            FaceAttend registers consenting users, verifies blink-based liveness, and records attendance for classes, labs, and team sessions.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+            <a href="/check-in" class="btn btn-primary">Check in</a>
+            <a href="/face-registration" class="btn btn-outline">Register face</a>
         </div>
     </div>
-</div>
+
+    <div class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
+        <h2 class="text-lg font-semibold">Today’s flow</h2>
+        <ol class="mt-4 space-y-3">
+            <li class="flex gap-3">
+                <span class="badge badge-primary">1</span>
+                <span>Register a face template after consent and liveness.</span>
+            </li>
+            <li class="flex gap-3">
+                <span class="badge badge-primary">2</span>
+                <span>Open an attendance session for a class or team.</span>
+            </li>
+            <li class="flex gap-3">
+                <span class="badge badge-primary">3</span>
+                <span>Check in with a blink challenge before recognition.</span>
+            </li>
+            <li class="flex gap-3">
+                <span class="badge badge-primary">4</span>
+                <span>Review present, absent, late, and manual-review records.</span>
+            </li>
+        </ol>
+    </div>
+</section>
 {% endblock %}

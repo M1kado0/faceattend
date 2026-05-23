@@ -1,15 +1,22 @@
 import os
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import cv2
 import numpy as np
 from dotenv import load_dotenv
 from insightface.app import FaceAnalysis
 
+from ml.liveness.active import ActiveLivenessChecker
+from ml.liveness.challenge import ActiveLivenessChallenge
 from ml.liveness.passive import PassiveLivenessChecker
 
 load_dotenv()
 liveness_model_path = os.getenv("LIVENESS_MODEL_PATH")
+active_liveness_model_path = os.getenv(
+    "ACTIVE_LIVENESS_MODEL_PATH",
+    "./models/face_landmarker.task",
+)
 liveness_threshold_passive = float(os.getenv("LIVENESS_THRESHOLD_PASSIVE", 0.85))
 
 
@@ -38,7 +45,8 @@ class EmptyEmbeddingError(FacePipelineError):
 
 
 _model: FaceAnalysis | None = None
-_passive_liveness_checker = PassiveLivenessChecker(liveness_model_path, liveness_threshold_passive)
+_passive_liveness_checker: PassiveLivenessChecker | None = None
+_active_liveness_checker: ActiveLivenessChecker | None = None
 
 
 def get_face_analyzer() -> FaceAnalysis:
@@ -49,7 +57,21 @@ def get_face_analyzer() -> FaceAnalysis:
     return _model
 
 
-_model = get_face_analyzer()
+def get_passive_liveness_checker() -> PassiveLivenessChecker:
+    global _passive_liveness_checker
+    if _passive_liveness_checker is None:
+        _passive_liveness_checker = PassiveLivenessChecker(
+            liveness_model_path,
+            liveness_threshold_passive,
+        )
+    return _passive_liveness_checker
+
+
+def get_active_liveness_checker() -> ActiveLivenessChecker:
+    global _active_liveness_checker
+    if _active_liveness_checker is None:
+        _active_liveness_checker = ActiveLivenessChecker(active_liveness_model_path)
+    return _active_liveness_checker
 
 
 def decode_image(raw: bytes) -> np.ndarray:
@@ -60,10 +82,11 @@ def decode_image(raw: bytes) -> np.ndarray:
 
 
 def detect_faces(image: np.ndarray) -> list:
+    _model = get_face_analyzer()
     return _model.get(image)
 
 
-def get_single_face(faces: list) -> np.ndarray:
+def get_single_face(faces: list) -> Any:
     if not faces:
         raise NoFaceDetectedError(422, "no_faces_detected")
     if len(faces) > 1:
@@ -100,5 +123,10 @@ def verify_passive_liveness(raw: bytes):
     faces = detect_faces(img)
     face = get_single_face(faces)
     bbox_xyxy = [float(v) for v in face.bbox]
-    result = _passive_liveness_checker.check(img, bbox_xyxy)
+    result = get_passive_liveness_checker().check(img, bbox_xyxy)
+    return asdict(result)
+
+
+def verify_active_liveness(raw: bytes, challenge: ActiveLivenessChallenge | str):
+    result = get_active_liveness_checker().check(raw, challenge)
     return asdict(result)

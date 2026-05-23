@@ -1,4 +1,5 @@
 """Public site test fixtures."""
+
 import sys
 from pathlib import Path
 

@@ -16,10 +16,10 @@ class User(BaseModel):
     token: str | None = None
 
 
-class Match(BaseModel):
-    match_id: str
+class AttendanceRecord(BaseModel):
+    record_id: str
     source_url: str
     source_page: str
     score: float
-    crawled_at: datetime
+    checked_in_at: datetime
     image_thumbnail_url: str | None = None

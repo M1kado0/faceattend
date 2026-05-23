@@ -1,4 +1,4 @@
-"""POST /v1/enroll — enroll a face with liveness first."""
+"""Face registration routes."""
 
 from __future__ import annotations
 
@@ -18,43 +18,50 @@ from backend.api.ml_client import (
     embed_image,
     verify_passive_liveness,
 )
-from backend.api.schemas import EnrollResponse
-from backend.api.services.match_scan import scan_and_persist_matches
+from backend.api.schemas import FaceRegistrationResponse
+from backend.api.services.attendance_record_scan import scan_and_persist_attendance_records
 from backend.audit.logger import log
-from backend.db.models.enrollment import Enrollment
+from backend.db.models.face_registration import FaceRegistration
 from backend.db.models.user import User
 from backend.db.session import get_session
 from backend.indexer.store import get_store
 
 load_dotenv()
 ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8003")
-MAX_ACTIVE_ENROLLMENTS = 3
+MAX_ACTIVE_FACE_REGISTRATIONS = 3
 index = get_store()
 router = APIRouter()
 
 
-@router.post("/enroll", response_model=EnrollResponse)
-async def enroll(
+@router.post("/", response_model=FaceRegistrationResponse)
+async def create_face_registration(
     photo: UploadFile,
     liveness_blob: UploadFile,
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
-) -> EnrollResponse:
-    await log(actor_id=user.id, actor_type=user.role, action="enroll.attempt", target_id=user.id)
+) -> FaceRegistrationResponse:
+    await log(
+        actor_id=user.id,
+        actor_type=user.role,
+        action="face_registration.attempt",
+        target_id=user.id,
+    )
 
-    existing_result = await session.execute(select(Enrollment).where(Enrollment.user_id == user.id))
-    existing_enrollments = existing_result.scalars().all()
-    if len(existing_enrollments) >= MAX_ACTIVE_ENROLLMENTS:
+    existing_result = await session.execute(
+        select(FaceRegistration).where(FaceRegistration.user_id == user.id)
+    )
+    existing_registrations = existing_result.scalars().all()
+    if len(existing_registrations) >= MAX_ACTIVE_FACE_REGISTRATIONS:
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="enroll.limit_reached",
+            action="face_registration.limit_reached",
             target_id=user.id,
-            metadata={"max_active_enrollments": MAX_ACTIVE_ENROLLMENTS},
+            metadata={"max_active_face_registrations": MAX_ACTIVE_FACE_REGISTRATIONS},
         )
-        raise HTTPException(status_code=409, detail="enrollment_limit_reached")
+        raise HTTPException(status_code=409, detail="face_registration_limit_reached")
 
-    # AUDIT: liveness must run before embedding to prevent non-consensual enrollment.
+    # AUDIT: liveness must run before embedding to prevent non-consensual face_registration.
     liveness_bytes = await liveness_blob.read()
     try:
         liveness = await verify_passive_liveness(
@@ -67,7 +74,7 @@ async def enroll(
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="enroll.liveness_rejected",
+            action="face_registration.liveness_rejected",
             target_id=user.id,
             metadata={"status_code": exc.status_code, "detail": exc.detail},
         )
@@ -76,7 +83,7 @@ async def enroll(
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="enroll.ml_error",
+            action="face_registration.ml_error",
             target_id=user.id,
         )
         raise HTTPException(503, "ml_service_unavailable") from exc
@@ -85,7 +92,7 @@ async def enroll(
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="enroll.liveness_failed",
+            action="face_registration.liveness_failed",
             target_id=user.id,
             metadata={"score": liveness.score, "reason": liveness.reason},
         )
@@ -100,14 +107,18 @@ async def enroll(
             content_type=photo.content_type or "application/octet-stream",
         )
     except MLServiceRejectedError as exc:
-        action = "enroll.no_faces_detected" if exc.status_code == 422 else "enroll.image_rejected"
+        action = (
+            "face_registration.no_faces_detected"
+            if exc.status_code == 422
+            else "face_registration.image_rejected"
+        )
         await log(actor_id=user.id, actor_type=user.role, action=action, target_id=user.id)
         raise HTTPException(exc.status_code, exc.detail) from exc
     except MLServiceUnavailableError as exc:
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="enroll.ml_error",
+            action="face_registration.ml_error",
             target_id=user.id,
         )
         raise HTTPException(503, "ml_service_unavailable") from exc
@@ -123,21 +134,21 @@ async def enroll(
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="enroll.index_error",
+            action="face_registration.index_error",
             target_id=user.id,
         )
         raise HTTPException(500, "index_error") from exc
 
-    enrollment = Enrollment(
+    face_registration = FaceRegistration(
         id=str(uuid.uuid4()),
         user_id=user.id,
         embedding_id=embedding_id,
         embedding_model_version=result.model_version,
     )
     try:
-        session.add(enrollment)
+        session.add(face_registration)
         await session.commit()
-        await session.refresh(enrollment)
+        await session.refresh(face_registration)
     except Exception as exc:
         await session.rollback()
         try:
@@ -146,10 +157,10 @@ async def enroll(
             await log(
                 actor_id=user.id,
                 actor_type=user.role,
-                action="enroll.cleanup_failed",
+                action="face_registration.cleanup_failed",
                 target_id=user.id,
                 metadata={
-                    "embedding_id": enrollment.embedding_id,
+                    "embedding_id": face_registration.embedding_id,
                     "reason": "db_commit_failed_after_index_add",
                     "cleanup_error": str(cleanup_exc),
                 },
@@ -157,15 +168,20 @@ async def enroll(
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="enroll.db_error",
+            action="face_registration.db_error",
             target_id=user.id,
             metadata={"embedding_id": embedding_id},
         )
         raise HTTPException(500, "db_error") from exc
 
-    await log(actor_id=user.id, actor_type=user.role, action="enroll.success", target_id=user.id)
+    await log(
+        actor_id=user.id,
+        actor_type=user.role,
+        action="face_registration.success",
+        target_id=user.id,
+    )
 
-    await scan_and_persist_matches(
+    await scan_and_persist_attendance_records(
         user=user,
         embedding=result.embedding,
         model_version=result.model_version,
@@ -173,72 +189,79 @@ async def enroll(
         top_k=10,
     )
 
-    return EnrollResponse(enrollment_id=enrollment.id, embedding_model_version=result.model_version)
+    return FaceRegistrationResponse(
+        registration_id=face_registration.id, embedding_model_version=result.model_version
+    )
 
 
-@router.get("/enrollments")
-async def list_enrollments(
+@router.get("/")
+async def list_face_registrations(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[dict]:
-    result = await session.execute(select(Enrollment).where(Enrollment.user_id == user.id))
-    enrollments = result.scalars().all()
+    result = await session.execute(
+        select(FaceRegistration).where(FaceRegistration.user_id == user.id)
+    )
+    face_registrations = result.scalars().all()
     return [
         {
-            "id": enrollment.id,
-            "embedding_id": enrollment.embedding_id,
-            "embedding_model_version": enrollment.embedding_model_version,
-            "created_at": enrollment.created_at,
+            "id": face_registration.id,
+            "embedding_id": face_registration.embedding_id,
+            "embedding_model_version": face_registration.embedding_model_version,
+            "created_at": face_registration.created_at,
         }
-        for enrollment in enrollments
+        for face_registration in face_registrations
     ]
 
 
-@router.delete("/enrollments/{enrollment_id}")
-async def delete_enrollment(
-    enrollment_id: str,
+@router.delete("/{registration_id}")
+async def delete_face_registration(
+    registration_id: str,
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, str]:
-    # AUDIT: enroll.delete
+    # AUDIT: face_registration.delete
     await log(
         actor_id=user.id,
         actor_type=user.role,
-        action="enroll.delete.attempt",
+        action="face_registration.delete.attempt",
         target_id=user.id,
-        metadata={"enrollment_id": enrollment_id},
+        metadata={"registration_id": registration_id},
     )
     result = await session.execute(
-        select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.user_id == user.id)
+        select(FaceRegistration).where(
+            FaceRegistration.id == registration_id,
+            FaceRegistration.user_id == user.id,
+        )
     )
-    enrollment = result.scalar_one_or_none()
-    if not enrollment:
+    face_registration = result.scalar_one_or_none()
+    if not face_registration:
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="enroll.delete.not_found",
+            action="face_registration.delete.not_found",
             target_id=user.id,
-            metadata={"enrollment_id": enrollment_id},
+            metadata={"registration_id": registration_id},
         )
-        raise HTTPException(status_code=404, detail="enrollment_not_found")
+        raise HTTPException(status_code=404, detail="face_registration_not_found")
 
     try:
-        await index.delete(embedding_id=enrollment.embedding_id)
+        await index.delete(embedding_id=face_registration.embedding_id)
     except Exception as exc:
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="enroll.delete.index_error",
+            action="face_registration.delete.index_error",
             target_id=user.id,
             metadata={
-                "enrollment_id": enrollment.id,
-                "embedding_id": enrollment.embedding_id,
+                "registration_id": face_registration.id,
+                "embedding_id": face_registration.embedding_id,
             },
         )
         raise HTTPException(500, "index_error") from exc
 
     try:
-        await session.delete(enrollment)
+        await session.delete(face_registration)
         await session.commit()
     except Exception as exc:
         await session.rollback()
@@ -246,11 +269,11 @@ async def delete_enrollment(
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="enroll.delete.db_error",
+            action="face_registration.delete.db_error",
             target_id=user.id,
             metadata={
-                "enrollment_id": enrollment_id,
-                "embedding_id": enrollment.embedding_id,
+                "registration_id": registration_id,
+                "embedding_id": face_registration.embedding_id,
                 "risk": "index_deleted_but_db_delete_failed",
             },
         )
@@ -259,11 +282,11 @@ async def delete_enrollment(
     await log(
         actor_id=user.id,
         actor_type=user.role,
-        action="enroll.delete.success",
+        action="face_registration.delete.success",
         target_id=user.id,
         metadata={
-            "enrollment_id": enrollment.id,
-            "embedding_id": enrollment.embedding_id,
+            "registration_id": face_registration.id,
+            "embedding_id": face_registration.embedding_id,
         },
     )
 

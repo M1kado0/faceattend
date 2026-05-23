@@ -6,6 +6,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 
 import cv2
 import mediapipe as mp
@@ -21,8 +22,8 @@ if __name__ == "__main__" and __package__ is None:
 from ml.liveness.base import LivenessResult
 from ml.liveness.challenge import ActiveLivenessChallenge
 
-LEFT_EYE = (33, 160, 158, 133, 153, 144)
-RIGHT_EYE = (362, 385, 387, 263, 373, 380)
+RIGHT_EYE = (33, 159, 158, 133, 153, 145)
+LEFT_EYE = (362, 380, 374, 263, 386, 385)
 
 
 @dataclass(frozen=True)
@@ -30,11 +31,11 @@ class ActiveLivenessConfig:
     """Tuning knobs for blink-based active liveness."""
 
     min_blinks: int = 2
-    min_seconds: float = 2.0
+    min_seconds: float = 1.0
     max_seconds: float = 6.0
     min_face_frame_ratio: float = 0.65
-    closed_eye_threshold: float = 0.20
-    open_eye_threshold: float = 0.24
+    closed_eye_threshold: float = 0.08
+    open_eye_threshold: float = 0.14
     max_faces: int = 1
     min_closed_frames: int = 2
     min_open_frames: int = 2
@@ -70,15 +71,22 @@ def _decode_video(video: bytes) -> tuple[list[VideoFrame], float]:
 
         frames: list[VideoFrame] = []
         frame_index = 0
+        last_timestamp_ms = -1
         while True:
             ok, frame_bgr = capture.read()
             if not ok:
                 break
 
-            timestamp_ms = int((frame_index / fps) * 1000)
+            timestamp_ms = _frame_timestamp_ms(
+                capture,
+                frame_index=frame_index,
+                fps=fps,
+                last_timestamp_ms=last_timestamp_ms,
+            )
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
 
             frames.append(VideoFrame(image_rgb=frame_rgb, timestamp_ms=timestamp_ms))
+            last_timestamp_ms = timestamp_ms
             frame_index += 1
 
         capture.release()
@@ -87,6 +95,22 @@ def _decode_video(video: bytes) -> tuple[list[VideoFrame], float]:
         raise VideoDecodeError("no_decodable_frames")
 
     return frames, len(frames) / fps
+
+
+def _frame_timestamp_ms(
+    capture: cv2.VideoCapture,
+    *,
+    frame_index: int,
+    fps: float,
+    last_timestamp_ms: int,
+) -> int:
+    metadata_timestamp_ms = int(capture.get(cv2.CAP_PROP_POS_MSEC))
+    fallback_timestamp_ms = int(round((frame_index / fps) * 1000))
+    timestamp_ms = metadata_timestamp_ms if metadata_timestamp_ms > 0 else fallback_timestamp_ms
+
+    if timestamp_ms <= last_timestamp_ms:
+        return last_timestamp_ms + 1
+    return timestamp_ms
 
 
 def _failed(
@@ -197,6 +221,8 @@ class MediaPipeActiveLivenessChecker:
         self.model_path = Path(model_path)
         self.config = config or ActiveLivenessConfig()
         self._landmarker: FaceLandmarker | None = None
+        self._landmarker_lock = Lock()
+        self._next_video_timestamp_offset_ms = 0
 
     def check(
         self,
@@ -245,7 +271,7 @@ class MediaPipeActiveLivenessChecker:
             )
         except ValueError as exc:
             return _failed(
-                "unsupported_challenge",
+                "landmarker_failed",
                 score=0.0,
                 reason=str(exc),
                 challenge_completed=False,
@@ -299,6 +325,21 @@ class MediaPipeActiveLivenessChecker:
                 score=0.0,
                 challenge_completed=False,
             )
+
+        with self._landmarker_lock:
+            timestamp_offset_ms = self._timestamp_offset_for_next_video(frames)
+            return self._check_blink_twice_with_offset(frames, timestamp_offset_ms)
+
+    def _timestamp_offset_for_next_video(self, frames: list[VideoFrame]) -> int:
+        timestamp_offset_ms = self._next_video_timestamp_offset_ms
+        self._next_video_timestamp_offset_ms += frames[-1].timestamp_ms + 1
+        return timestamp_offset_ms
+
+    def _check_blink_twice_with_offset(
+        self,
+        frames: list[VideoFrame],
+        timestamp_offset_ms: int,
+    ) -> LivenessResult:
         blink_counter = BlinkCounter(
             self.config.closed_eye_threshold,
             self.config.open_eye_threshold,
@@ -309,10 +350,12 @@ class MediaPipeActiveLivenessChecker:
 
         face_frames = 0
         multiple_face_frames = 0
+        ear_values: list[float] = []
         for frame in frames:
+            timestamp_ms = frame.timestamp_ms + timestamp_offset_ms
             result = self._landmarker_instance().detect_for_video(
                 mp.Image(image_format=mp.ImageFormat.SRGB, data=frame.image_rgb),
-                frame.timestamp_ms,
+                timestamp_ms,
             )
             face_count = len(result.face_landmarks)
             if face_count == 0:
@@ -323,9 +366,17 @@ class MediaPipeActiveLivenessChecker:
 
             face_frames += 1
             ear = _average_eye_aspect_ratio(result.face_landmarks[0])
-            blink_counter.observe(ear, frame.timestamp_ms)
+            ear_values.append(ear)
+            blink_counter.observe(ear, timestamp_ms)
 
         multiple_face_ratio = multiple_face_frames / len(frames)
+        self._print_blink_debug(
+            total_frames=len(frames),
+            face_frames=face_frames,
+            multiple_face_frames=multiple_face_frames,
+            ear_values=ear_values,
+            blink_count=blink_counter.blinks,
+        )
         if multiple_face_ratio > self.config.max_multiple_face_frame_ratio:
             return _failed(
                 "multiple_faces_detected",
@@ -349,4 +400,41 @@ class MediaPipeActiveLivenessChecker:
             label=ActiveLivenessChallenge.BLINK_TWICE.value,
             reason=None if challenge_completed else "challenge_not_completed",
             challenge_completed=challenge_completed,
+        )
+
+    def _print_blink_debug(
+        self,
+        *,
+        total_frames: int,
+        face_frames: int,
+        multiple_face_frames: int,
+        ear_values: list[float],
+        blink_count: int,
+    ) -> None:
+        face_frame_ratio = face_frames / total_frames
+        multiple_face_ratio = multiple_face_frames / total_frames
+
+        print(
+            "[liveness-debug] "
+            f"frames={total_frames} "
+            f"face_frames={face_frames} "
+            f"face_frame_ratio={face_frame_ratio:.3f} "
+            f"multiple_face_frames={multiple_face_frames} "
+            f"multiple_face_ratio={multiple_face_ratio:.3f} "
+            f"blink_count={blink_count} "
+            f"closed_threshold={self.config.closed_eye_threshold:.3f} "
+            f"open_threshold={self.config.open_eye_threshold:.3f}"
+        )
+
+        if not ear_values:
+            print("[liveness-debug] no EAR values; no single-face frames detected")
+            return
+
+        ear_preview = ", ".join(f"{value:.3f}" for value in ear_values[:20])
+        print(
+            "[liveness-debug] "
+            f"ear_min={min(ear_values):.3f} "
+            f"ear_max={max(ear_values):.3f} "
+            f"ear_avg={sum(ear_values) / len(ear_values):.3f} "
+            f"ear_first_20=[{ear_preview}]"
         )

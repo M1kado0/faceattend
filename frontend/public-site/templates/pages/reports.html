@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Reports | FaceAttend{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold">Attendance reports</h1>
+        <p class="mt-2 text-base-content/70">
+            Review session attendance and export records once the reporting backend is connected.
+        </p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-3">
+        <label class="form-control">
+            <span class="label-text mb-2">Date</span>
+            <input type="date" class="input input-bordered" disabled>
+        </label>
+        <label class="form-control">
+            <span class="label-text mb-2">Session</span>
+            <select class="select select-bordered" disabled>
+                <option>Demo Attendance Session</option>
+            </select>
+        </label>
+        <div class="flex items-end">
+            <button class="btn btn-primary w-full" type="button" disabled>Export CSV</button>
+        </div>
+    </div>
+
+    <div class="mt-8 rounded-lg border border-dashed border-base-300 bg-base-100 p-8 text-center">
+        <h2 class="text-lg font-semibold">No report data yet</h2>
+        <p class="mt-2 text-sm text-base-content/70">
+            Attendance records will appear here after check-ins are connected to sessions.
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Results | FaceAttend{% endblock %}
+
+{% block content %}
+{% if not has_face_registrations %}
+<div role="alert" class="alert">
+    <span>Register your face before checking in to attendance sessions.</span>
+    <a href="/face-registration" class="btn btn-primary btn-sm">Register face</a>
+</div>
+{% elif not attendance_records %}
+<div role="alert" class="alert">
+    <span>No attendance records yet. Complete a check-in to see your result here.</span>
+</div>
+{% else %}
+<div class="mb-6">
+    <h1 class="text-3xl font-bold">Attendance results</h1>
+    <p class="mt-2 text-base-content/70">
+        Recent recognition results from liveness-gated check-ins.
+    </p>
+</div>
+<ul class="grid grid-cols-1 gap-4 md:grid-cols-2">
+    {% for record in attendance_records %}
+    <li class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title text-base">Check-in result</h2>
+            <dl class="space-y-2 text-sm">
+                {% if record.image_thumbnail_url %}
+                <img
+                    src="{{ record.image_thumbnail_url }}"
+                    alt="Recognized face preview"
+                    class="h-48 w-full rounded object-cover"
+                >
+                {% endif %}
+                <div>
+                    <dt class="font-medium text-base-content/70">Recognition confidence</dt>
+                    <dd>{{ "%.3f"|format(record.score) }}</dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-base-content/70">Record ID</dt>
+                    <dd class="break-all">{{ record.record_id }}</dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-base-content/70">Session</dt>
+                    <dd class="break-all">{{ record.session_id or "Default session" }}</dd>
+                </div>
+                {% if record.checked_in_at %}
+                <div>
+                    <dt class="font-medium text-base-content/70">Checked in at</dt>
+                    <dd class="break-all">{{ record.checked_in_at }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+
+            <div class="card-actions justify-end">
+                <a href="/attendance/{{ record.record_id }}" class="btn btn-sm">
+                    Details
+                </a>
+            </div>
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

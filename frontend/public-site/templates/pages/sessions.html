@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Sessions | FaceAttend{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+        <h1 class="text-3xl font-bold">Attendance sessions</h1>
+        <p class="mt-2 text-base-content/70">
+            Open a session for students or team members to check in with liveness.
+        </p>
+    </div>
+    <button class="btn btn-primary" type="button" disabled>Create session</button>
+</div>
+
+<div class="overflow-x-auto rounded-lg border border-base-300 bg-base-100 shadow-sm">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Session</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Attendance</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for session in sessions %}
+            <tr>
+                <td class="font-medium">{{ session.name }}</td>
+                <td>{{ session.time }}</td>
+                <td><span class="badge badge-success">{{ session.status }}</span></td>
+                <td>{{ session.present }} / {{ session.expected }}</td>
+                <td class="text-right">
+                    <a href="/check-in" class="btn btn-primary btn-sm">Take attendance</a>
+                    <a href="/attendance" class="btn btn-outline btn-sm">View results</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

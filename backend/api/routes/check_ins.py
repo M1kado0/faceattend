@@ -1,4 +1,4 @@
-"""POST /v1/search — search by face with liveness first."""
+"""POST /v1/check-ins — check in by face with liveness first."""
 
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ from backend.api.ml_client import (
     embed_image,
     verify_passive_liveness,
 )
-from backend.api.schemas import SearchResponse
-from backend.api.services.match_scan import scan_and_persist_matches
+from backend.api.schemas import CheckInResponse
+from backend.api.services.attendance_record_scan import scan_and_persist_attendance_records
 from backend.audit.logger import log
 from backend.db.models.user import User
 from backend.db.session import get_session
@@ -29,14 +29,14 @@ ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8003")
 router = APIRouter()
 
 
-@router.post("/search", response_model=SearchResponse)
-async def search(
+@router.post("/check-ins", response_model=CheckInResponse)
+async def check_in(
     photo: UploadFile,
     liveness_blob: UploadFile,
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
-) -> SearchResponse:
-    await log(actor_id=user.id, actor_type=user.role, action="search.attempt", target_id=user.id)
+) -> CheckInResponse:
+    await log(actor_id=user.id, actor_type=user.role, action="check_in.attempt", target_id=user.id)
 
     # AUDIT: liveness must run before embedding to prevent stalking use.
     liveness_bytes = await liveness_blob.read()
@@ -51,7 +51,7 @@ async def search(
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="search.liveness_rejected",
+            action="check_in.liveness_rejected",
             target_id=user.id,
             metadata={"status_code": exc.status_code, "detail": exc.detail},
         )
@@ -60,7 +60,7 @@ async def search(
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="search.ml_error",
+            action="check_in.ml_error",
             target_id=user.id,
         )
         raise HTTPException(503, "ml_service_unavailable") from exc
@@ -69,7 +69,7 @@ async def search(
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="search.liveness_failed",
+            action="check_in.liveness_failed",
             target_id=user.id,
             metadata={"score": liveness.score, "reason": liveness.reason},
         )
@@ -84,19 +84,21 @@ async def search(
             content_type=photo.content_type or "application/octet-stream",
         )
     except MLServiceRejectedError as exc:
-        action = "search.no_faces_detected" if exc.status_code == 422 else "search.image_rejected"
+        action = (
+            "check_in.no_faces_detected" if exc.status_code == 422 else "check_in.image_rejected"
+        )
         await log(actor_id=user.id, actor_type=user.role, action=action, target_id=user.id)
         raise HTTPException(exc.status_code, exc.detail) from exc
     except MLServiceUnavailableError as exc:
         await log(
             actor_id=user.id,
             actor_type=user.role,
-            action="search.ml_error",
+            action="check_in.ml_error",
             target_id=user.id,
         )
         raise HTTPException(503, "ml_service_unavailable") from exc
 
-    matches = await scan_and_persist_matches(
+    attendance_records = await scan_and_persist_attendance_records(
         user=user,
         embedding=result.embedding,
         model_version=result.model_version,
@@ -104,4 +106,7 @@ async def search(
         top_k=10,
     )
 
-    return SearchResponse(query_id=str(uuid.uuid4()), matches=matches)
+    return CheckInResponse(
+        query_id=str(uuid.uuid4()),
+        attendance_records=attendance_records,
+    )

@@ -1,4 +1,4 @@
-"""/matches — match dashboard + detail."""
+"""/attendance — attendance result dashboard + detail."""
 
 import os
 from pathlib import Path
@@ -26,14 +26,13 @@ templates = Jinja2Templates(
 )
 
 
-@router.get("/matches", response_class=HTMLResponse)
-async def matches_list(request: Request):
+@router.get("/check-in", response_class=HTMLResponse)
+async def check_in_page(request: Request):
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
         return RedirectResponse("/login", status_code=303)
     try:
-        enrollments = await backend_client.list_enrollments(token=token)
-        matches = await backend_client.list_matches(token=token)
+        face_registrations = await backend_client.list_face_registrations(token=token)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 401:
             return templates.TemplateResponse(
@@ -42,7 +41,38 @@ async def matches_list(request: Request):
             )
         return templates.TemplateResponse(
             request=request,
-            name="partials/matches_error.html",
+            name="partials/check_in_error.html",
+        )
+    except httpx.RequestError:
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/backend_unavailable.html",
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="pages/check_in.html",
+        context={"has_registration": bool(face_registrations)},
+    )
+
+
+@router.get("/attendance", response_class=HTMLResponse)
+async def attendance_list(request: Request):
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not token:
+        return RedirectResponse("/login", status_code=303)
+    try:
+        face_registrations = await backend_client.list_face_registrations(token=token)
+        attendance_records = await backend_client.list_attendance_records(token=token)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            return templates.TemplateResponse(
+                request=request,
+                name="partials/login_required.html",
+            )
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/attendance_error.html",
         )
     except httpx.RequestError:
         return templates.TemplateResponse(
@@ -51,13 +81,16 @@ async def matches_list(request: Request):
         )
     return templates.TemplateResponse(
         request=request,
-        name="pages/matches.html",
-        context={"matches": matches, "has_enrollments": bool(enrollments)},
+        name="pages/attendance_results.html",
+        context={
+            "attendance_records": attendance_records,
+            "has_face_registrations": bool(face_registrations),
+        },
     )
 
 
-@router.get("/matches/{match_id}", response_class=HTMLResponse)
-async def match_detail(request: Request, match_id: str):
+@router.get("/attendance/{record_id}", response_class=HTMLResponse)
+async def attendance_detail(request: Request, record_id: str):
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
         return templates.TemplateResponse(
@@ -65,7 +98,10 @@ async def match_detail(request: Request, match_id: str):
             name="partials/login_required.html",
         )
     try:
-        match = await backend_client.get_match(token=token, match_id=match_id)
+        attendance_record = await backend_client.get_attendance_record(
+            token=token,
+            record_id=record_id,
+        )
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 401:
             return templates.TemplateResponse(
@@ -75,11 +111,11 @@ async def match_detail(request: Request, match_id: str):
         if exc.response.status_code == 404:
             return templates.TemplateResponse(
                 request=request,
-                name="partials/match_not_found.html",
+                name="partials/attendance_record_not_found.html",
             )
         return templates.TemplateResponse(
             request=request,
-            name="partials/matches_error.html",
+            name="partials/attendance_error.html",
         )
     except httpx.RequestError:
         return templates.TemplateResponse(
@@ -88,6 +124,6 @@ async def match_detail(request: Request, match_id: str):
         )
     return templates.TemplateResponse(
         request=request,
-        name="pages/match_detail.html",
-        context={"match": match},
+        name="pages/attendance_record.html",
+        context={"attendance_record": attendance_record},
     )

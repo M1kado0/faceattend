@@ -10,6 +10,7 @@ from ml.liveness.mediapipe_active import (
     VideoDecodeError,
     VideoFrame,
     _decode_video,
+    _frame_timestamp_ms,
 )
 
 
@@ -31,6 +32,25 @@ def _blink_counter(*, cooldown_ms: int = 250) -> BlinkCounter:
 def _observe_sequence(counter: BlinkCounter, values: list[float]) -> None:
     for index, eye_aspect_ratio in enumerate(values):
         counter.observe(eye_aspect_ratio, timestamp_ms=index * 100)
+
+
+class _FakeCapture:
+    def __init__(self, timestamp_ms: float) -> None:
+        self.timestamp_ms = timestamp_ms
+
+    def get(self, _property_id: int) -> float:
+        return self.timestamp_ms
+
+
+def test_frame_timestamp_ms_clamps_duplicate_metadata_timestamps() -> None:
+    timestamp_ms = _frame_timestamp_ms(
+        _FakeCapture(timestamp_ms=100.0),
+        frame_index=4,
+        fps=30.0,
+        last_timestamp_ms=100,
+    )
+
+    assert timestamp_ms == 101
 
 
 def test_blink_counter_counts_stable_closed_to_open_transitions() -> None:
@@ -131,3 +151,17 @@ def test_validate_duration_accepts_allowed_video_duration() -> None:
     )
 
     assert checker._validate_duration(3.0) is None
+
+
+def test_timestamp_offset_for_next_video_advances_between_requests() -> None:
+    checker = MediaPipeActiveLivenessChecker(model_path="missing.task")
+    frames = [
+        VideoFrame(image_rgb=object(), timestamp_ms=0),
+        VideoFrame(image_rgb=object(), timestamp_ms=100),
+    ]
+
+    first_offset = checker._timestamp_offset_for_next_video(frames)
+    second_offset = checker._timestamp_offset_for_next_video(frames)
+
+    assert first_offset == 0
+    assert second_offset == 101

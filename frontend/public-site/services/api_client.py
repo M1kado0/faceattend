@@ -35,53 +35,23 @@ class BackendClient:
         r.raise_for_status()
         return r.json()
 
-    # --- Search / Enroll ---
+    # --- Attendance / Face registration ---
 
-    async def search(
+    async def create_face_registration(
         self,
         *,
-        photo: bytes,
-        liveness_blob: bytes,
+        liveness_video: bytes,
         token: str,
-        photo_filename: str = "photo.jpg",
-        photo_content_type: str = "image/jpeg",
-        liveness_filename: str = "liveness.jpg",
-        liveness_content_type: str = "image/jpeg",
-    ) -> list[dict]:
-        r = await self._client.post(
-            "/v1/search",
-            files={
-                "photo": (photo_filename, photo, photo_content_type),
-                "liveness_blob": (
-                    liveness_filename,
-                    liveness_blob,
-                    liveness_content_type,
-                ),
-            },
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        r.raise_for_status()
-        return r.json()["matches"]
-
-    async def enroll(
-        self,
-        *,
-        photo: bytes,
-        liveness_blob: bytes,
-        token: str,
-        photo_filename: str = "photo.jpg",
-        photo_content_type: str = "image/jpeg",
-        liveness_filename: str = "liveness.jpg",
-        liveness_content_type: str = "image/jpeg",
+        liveness_video_filename: str = "liveness.webm",
+        liveness_video_content_type: str = "video/webm",
     ) -> dict[str, Any]:
         r = await self._client.post(
-            "/v1/enroll",
+            "/v1/face-registrations",
             files={
-                "photo": (photo_filename, photo, photo_content_type),
-                "liveness_blob": (
-                    liveness_filename,
-                    liveness_blob,
-                    liveness_content_type,
+                "liveness_video": (
+                    liveness_video_filename,
+                    liveness_video,
+                    liveness_video_content_type,
                 ),
             },
             headers={"Authorization": f"Bearer {token}"},
@@ -89,33 +59,38 @@ class BackendClient:
         r.raise_for_status()
         return r.json()
 
-    async def list_enrollments(self, *, token: str) -> list[dict]:
+    async def list_face_registrations(self, *, token: str) -> list[dict]:
         r = await self._client.get(
-            "/v1/enrollments",
+            "/v1/face-registrations",
             headers={"Authorization": f"Bearer {token}"},
         )
         r.raise_for_status()
         return r.json()
 
-    async def delete_enrollment(self, *, token: str, enrollment_id: str) -> dict[str, str]:
+    async def delete_face_registration(
+        self,
+        *,
+        token: str,
+        registration_id: str,
+    ) -> dict[str, str]:
         r = await self._client.delete(
-            f"/v1/enrollments/{enrollment_id}",
+            f"/v1/face-registrations/{registration_id}",
             headers={"Authorization": f"Bearer {token}"},
         )
         r.raise_for_status()
         return r.json()
 
-    async def list_matches(self, *, token: str) -> list[dict]:
+    async def list_attendance_records(self, *, token: str) -> list[dict]:
         r = await self._client.get(
-            "/v1/matches/",
+            "/v1/attendance-records",
             headers={"Authorization": f"Bearer {token}"},
         )
         r.raise_for_status()
         return r.json()
 
-    async def get_match(self, *, token: str, match_id: str) -> dict:
+    async def get_attendance_record(self, *, token: str, record_id: str) -> dict:
         r = await self._client.get(
-            f"/v1/matches/{match_id}",
+            f"/v1/attendance-records/{record_id}",
             headers={"Authorization": f"Bearer {token}"},
         )
         r.raise_for_status()

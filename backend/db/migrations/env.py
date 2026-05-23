@@ -21,9 +21,9 @@ from sqlmodel import SQLModel
 from backend.db.models import (
     api_key,
     audit_log,
+    attendance_record,
     cluster,
-    enrollment,
-    match,
+    face_registration,
     takedown,
     user,
     webhook,

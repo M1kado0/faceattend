@@ -1,0 +1,13 @@
+<div role="alert" class="alert alert-success">
+    <div>
+        <h2 class="font-semibold">Face registered</h2>
+        <p class="text-sm">
+            Your verified face template is ready for attendance check-ins.
+        </p>
+        {% if face_registration %}
+        <p class="mt-1 text-xs text-base-content/70">
+            Model: {{ face_registration.embedding_model_version }}
+        </p>
+        {% endif %}
+    </div>
+</div>
