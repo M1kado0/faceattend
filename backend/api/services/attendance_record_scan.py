@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime
 
@@ -15,6 +16,7 @@ from backend.db.models.user import User
 from backend.indexer.store import get_store
 
 index = get_store()
+MIN_ATTENDANCE_MATCH_SCORE = float(os.getenv("ATTENDANCE_MATCH_THRESHOLD", "0.75"))
 
 
 async def scan_and_persist_attendance_records(
@@ -29,7 +31,10 @@ async def scan_and_persist_attendance_records(
         raw_results = await index.search(
             embedding=embedding,
             top_k=top_k,
-            filter={"embedding_model_version": model_version},
+            filter={
+                "embedding_model_version": model_version,
+                "user_id": user.id,
+            },
         )
     except Exception as exc:
         await log(
@@ -42,7 +47,7 @@ async def scan_and_persist_attendance_records(
 
     results = []
     for vector_result in raw_results:
-        if vector_result.metadata.get("user_id") == user.id:
+        if vector_result.score < MIN_ATTENDANCE_MATCH_SCORE:
             continue
         results.append(vector_result)
 
@@ -106,3 +111,103 @@ async def scan_and_persist_attendance_records(
 
     await log(actor_id=user.id, actor_type=user.role, action="check_in.success", target_id=user.id)
     return attendance_records
+
+
+async def scan_best_and_persist_attendance_record(
+    *,
+    user: User,
+    embeddings: list[np.ndarray],
+    model_version: str,
+    session: AsyncSession,
+    top_k: int = 10,
+) -> list[AttendanceRecord]:
+    """Search several live-frame embeddings and persist only the strongest match."""
+    best_result = None
+    for embedding in embeddings:
+        try:
+            raw_results = await index.search(
+                embedding=embedding,
+                top_k=top_k,
+                filter={
+                    "embedding_model_version": model_version,
+                    "user_id": user.id,
+                },
+            )
+        except Exception as exc:
+            await log(
+                actor_id=user.id,
+                actor_type=user.role,
+                action="check_in.index_error",
+                target_id=user.id,
+            )
+            raise HTTPException(500, "index_error") from exc
+
+        for vector_result in raw_results:
+            if vector_result.score < MIN_ATTENDANCE_MATCH_SCORE:
+                continue
+            if best_result is None or vector_result.score > best_result.score:
+                best_result = vector_result
+
+    if best_result is None:
+        await log(
+            actor_id=user.id,
+            actor_type=user.role,
+            action="check_in.success",
+            target_id=user.id,
+            metadata={"attendance_records": 0},
+        )
+        return []
+
+    existing_result = await session.execute(
+        select(AttendanceRecordRow).where(
+            AttendanceRecordRow.user_id == user.id,
+            AttendanceRecordRow.face_registration_id == best_result.embedding_id,
+        )
+    )
+    existing_record = existing_result.scalar_one_or_none()
+
+    check_in_created_at = datetime.utcnow()
+    if existing_record is None:
+        metadata = best_result.metadata
+        attendance_record = AttendanceRecordRow(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            face_registration_id=best_result.embedding_id,
+            session_id=metadata.get("session_id"),
+            score=float(best_result.score),
+            checked_in_at=metadata.get("checked_in_at", check_in_created_at),
+            notified_at=None,
+            created_at=check_in_created_at,
+        )
+        session.add(attendance_record)
+        try:
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            await log(
+                actor_id=user.id,
+                actor_type=user.role,
+                action="attendance_record.persist_error",
+                target_id=user.id,
+            )
+            raise HTTPException(500, "attendance_record_persist_error") from exc
+    else:
+        attendance_record = existing_record
+
+    await log(
+        actor_id=user.id,
+        actor_type=user.role,
+        action="check_in.success",
+        target_id=user.id,
+        metadata={"best_score": float(best_result.score)},
+    )
+    return [
+        AttendanceRecord(
+            record_id=attendance_record.id,
+            face_registration_id=attendance_record.face_registration_id,
+            session_id=attendance_record.session_id,
+            score=attendance_record.score,
+            checked_in_at=attendance_record.checked_in_at,
+            created_at=attendance_record.created_at,
+        )
+    ]

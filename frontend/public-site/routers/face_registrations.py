@@ -89,7 +89,11 @@ async def create_face_registration(request: Request, liveness_video: UploadFile)
                 data = exc.response.json()
             except ValueError:
                 data = {}
-            if data.get("detail") == "liveness_failed":
+            if data.get("detail") in {
+                "liveness_failed",
+                "passive_liveness_failed",
+                "face_not_visible_enough",
+            }:
                 return templates.TemplateResponse(
                     request=request,
                     name="partials/liveness_failed.html",

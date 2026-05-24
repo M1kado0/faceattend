@@ -12,6 +12,12 @@ def _files() -> dict[str, tuple[str, bytes, str]]:
     }
 
 
+def _check_in_files() -> dict[str, tuple[str, bytes, str]]:
+    return {
+        "liveness_video": ("liveness.webm", b"video-bytes", "video/webm"),
+    }
+
+
 def _status_error(status_code: int, detail: str) -> httpx.HTTPStatusError:
     request = httpx.Request("POST", "http://backend.test/v1/face-registrations")
     response = httpx.Response(status_code, json={"detail": detail}, request=request)
@@ -64,9 +70,11 @@ class FakeAttendanceClient:
     face_registration_result: list[dict] | None = None
     list_result: list[dict] | None = None
     detail_result: dict | None = None
+    check_in_result: dict | None = None
     face_registration_error: Exception | None = None
     list_error: Exception | None = None
     detail_error: Exception | None = None
+    check_in_error: Exception | None = None
 
     async def list_face_registrations(self, **kwargs) -> list[dict]:
         if self.face_registration_error is not None:
@@ -90,12 +98,11 @@ class FakeAttendanceClient:
         return [
             {
                 "record_id": "record-1",
-                "source_url": "https://example.test/image.jpg",
-                "source_page": "https://example.test/page",
+                "face_registration_id": "registration-1",
+                "session_id": "session-1",
                 "score": 0.91,
                 "checked_in_at": "2026-05-18T00:00:00Z",
                 "created_at": "2026-05-18T00:00:00Z",
-                "image_thumbnail_url": None,
             }
         ]
 
@@ -104,12 +111,28 @@ class FakeAttendanceClient:
             raise self.detail_error
         return self.detail_result or {
             "record_id": "record-1",
-            "source_url": "https://example.test/image.jpg",
-            "source_page": "https://example.test/page",
+            "face_registration_id": "registration-1",
+            "session_id": "session-1",
             "score": 0.91,
             "checked_in_at": "2026-05-18T00:00:00Z",
             "created_at": "2026-05-18T00:00:00Z",
-            "image_thumbnail_url": None,
+        }
+
+    async def check_in(self, **kwargs) -> dict:
+        if self.check_in_error is not None:
+            raise self.check_in_error
+        return self.check_in_result or {
+            "query_id": "query-1",
+            "attendance_records": [
+                {
+                    "record_id": "record-1",
+                    "face_registration_id": "registration-1",
+                    "session_id": "session-1",
+                    "score": 0.91,
+                    "checked_in_at": "2026-05-18T00:00:00Z",
+                    "created_at": "2026-05-18T00:00:00Z",
+                }
+            ],
         }
 
 
@@ -250,6 +273,55 @@ def test_check_in_page_shows_registration_prompt_without_face_registration(
     assert "Register your face before checking in." in response.text
 
 
+def test_check_in_without_session_returns_login_required(client) -> None:
+    response = client.post("/check-in", files=_check_in_files())
+
+    assert response.status_code == 200
+    assert "Login required" in response.text
+
+
+def test_successful_check_in_redirects_to_attendance(client, monkeypatch) -> None:
+    attendance_module = pytest.importorskip("routers.attendance")
+    monkeypatch.setattr(attendance_module, "backend_client", FakeAttendanceClient())
+    client.cookies.set("session_token", "token")
+
+    response = client.post("/check-in", files=_check_in_files())
+
+    assert response.status_code == 204
+    assert response.headers["HX-Redirect"] == "/attendance"
+
+
+def test_check_in_liveness_failure_returns_liveness_partial(client, monkeypatch) -> None:
+    attendance_module = pytest.importorskip("routers.attendance")
+    monkeypatch.setattr(
+        attendance_module,
+        "backend_client",
+        FakeAttendanceClient(check_in_error=_status_error(403, "liveness_failed")),
+    )
+    client.cookies.set("session_token", "token")
+
+    response = client.post("/check-in", files=_check_in_files())
+
+    assert response.status_code == 200
+    assert "Liveness check failed" in response.text
+
+
+def test_check_in_identity_mismatch_returns_warning_partial(client, monkeypatch) -> None:
+    attendance_module = pytest.importorskip("routers.attendance")
+    monkeypatch.setattr(
+        attendance_module,
+        "backend_client",
+        FakeAttendanceClient(check_in_error=_status_error(403, "identity_not_matched")),
+    )
+    client.cookies.set("session_token", "token")
+
+    response = client.post("/check-in", files=_check_in_files())
+
+    assert response.status_code == 200
+    assert "Face not recognized" in response.text
+    assert "not recorded" in response.text
+
+
 def test_sessions_page_shows_attendance_session(client) -> None:
     response = client.get("/sessions")
 
@@ -280,8 +352,10 @@ def test_successful_attendance_list_returns_results_page(client, monkeypatch) ->
     response = client.get("/attendance")
 
     assert response.status_code == 200
-    assert "Check-in result" in response.text
+    assert "Latest check-in recorded" in response.text
+    assert "Recent check-ins" in response.text
     assert "record-1" in response.text
+    assert "registration-1" in response.text
 
 
 def test_attendance_list_without_registration_shows_setup_state(client, monkeypatch) -> None:
@@ -342,6 +416,19 @@ def test_attendance_detail_404_returns_record_not_found(client, monkeypatch) -> 
 
     assert response.status_code == 200
     assert "Attendance record not found" in response.text
+
+
+def test_attendance_detail_shows_attendance_fields(client, monkeypatch) -> None:
+    attendance_module = pytest.importorskip("routers.attendance")
+    monkeypatch.setattr(attendance_module, "backend_client", FakeAttendanceClient())
+    client.cookies.set("session_token", "token")
+
+    response = client.get("/attendance/record-1")
+
+    assert response.status_code == 200
+    assert "Checked in" in response.text
+    assert "session-1" in response.text
+    assert "registration-1" in response.text
 
 
 def test_attendance_detail_backend_500_returns_attendance_error(client, monkeypatch) -> None:

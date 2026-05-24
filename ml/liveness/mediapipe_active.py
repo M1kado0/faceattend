@@ -370,13 +370,6 @@ class MediaPipeActiveLivenessChecker:
             blink_counter.observe(ear, timestamp_ms)
 
         multiple_face_ratio = multiple_face_frames / len(frames)
-        self._print_blink_debug(
-            total_frames=len(frames),
-            face_frames=face_frames,
-            multiple_face_frames=multiple_face_frames,
-            ear_values=ear_values,
-            blink_count=blink_counter.blinks,
-        )
         if multiple_face_ratio > self.config.max_multiple_face_frame_ratio:
             return _failed(
                 "multiple_faces_detected",
@@ -400,41 +393,4 @@ class MediaPipeActiveLivenessChecker:
             label=ActiveLivenessChallenge.BLINK_TWICE.value,
             reason=None if challenge_completed else "challenge_not_completed",
             challenge_completed=challenge_completed,
-        )
-
-    def _print_blink_debug(
-        self,
-        *,
-        total_frames: int,
-        face_frames: int,
-        multiple_face_frames: int,
-        ear_values: list[float],
-        blink_count: int,
-    ) -> None:
-        face_frame_ratio = face_frames / total_frames
-        multiple_face_ratio = multiple_face_frames / total_frames
-
-        print(
-            "[liveness-debug] "
-            f"frames={total_frames} "
-            f"face_frames={face_frames} "
-            f"face_frame_ratio={face_frame_ratio:.3f} "
-            f"multiple_face_frames={multiple_face_frames} "
-            f"multiple_face_ratio={multiple_face_ratio:.3f} "
-            f"blink_count={blink_count} "
-            f"closed_threshold={self.config.closed_eye_threshold:.3f} "
-            f"open_threshold={self.config.open_eye_threshold:.3f}"
-        )
-
-        if not ear_values:
-            print("[liveness-debug] no EAR values; no single-face frames detected")
-            return
-
-        ear_preview = ", ".join(f"{value:.3f}" for value in ear_values[:20])
-        print(
-            "[liveness-debug] "
-            f"ear_min={min(ear_values):.3f} "
-            f"ear_max={max(ear_values):.3f} "
-            f"ear_avg={sum(ear_values) / len(ear_values):.3f} "
-            f"ear_first_20=[{ear_preview}]"
         )

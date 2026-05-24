@@ -3,6 +3,13 @@
 {% block title %}Attendance Results | FaceAttend{% endblock %}
 
 {% block content %}
+<div class="mb-6">
+    <h1 class="text-3xl font-bold">Attendance</h1>
+    <p class="mt-2 text-base-content/70">
+        Latest liveness-gated check-ins for your account.
+    </p>
+</div>
+
 {% if not has_face_registrations %}
 <div role="alert" class="alert">
     <span>Register your face before checking in to attendance sessions.</span>
@@ -11,52 +18,52 @@
 {% elif not attendance_records %}
 <div role="alert" class="alert">
     <span>No attendance records yet. Complete a check-in to see your result here.</span>
+    <a href="/check-in" class="btn btn-primary btn-sm">Check in</a>
 </div>
 {% else %}
-<div class="mb-6">
-    <h1 class="text-3xl font-bold">Attendance results</h1>
-    <p class="mt-2 text-base-content/70">
-        Recent recognition results from liveness-gated check-ins.
-    </p>
-</div>
-<ul class="grid grid-cols-1 gap-4 md:grid-cols-2">
-    {% for record in attendance_records %}
-    <li class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title text-base">Check-in result</h2>
-            <dl class="space-y-2 text-sm">
-                {% if record.image_thumbnail_url %}
-                <img
-                    src="{{ record.image_thumbnail_url }}"
-                    alt="Recognized face preview"
-                    class="h-48 w-full rounded object-cover"
-                >
-                {% endif %}
-                <div>
-                    <dt class="font-medium text-base-content/70">Recognition confidence</dt>
-                    <dd>{{ "%.3f"|format(record.score) }}</dd>
-                </div>
-                <div>
-                    <dt class="font-medium text-base-content/70">Record ID</dt>
-                    <dd class="break-all">{{ record.record_id }}</dd>
-                </div>
-                <div>
-                    <dt class="font-medium text-base-content/70">Session</dt>
-                    <dd class="break-all">{{ record.session_id or "Default session" }}</dd>
-                </div>
-                {% if record.checked_in_at %}
-                <div>
-                    <dt class="font-medium text-base-content/70">Checked in at</dt>
-                    <dd class="break-all">{{ record.checked_in_at }}</dd>
-                </div>
-                {% endif %}
-            </dl>
+{% set latest_record = attendance_records[0] %}
 
-            <div class="card-actions justify-end">
-                <a href="/attendance/{{ record.record_id }}" class="btn btn-sm">
-                    Details
-                </a>
+<div class="mb-6 rounded-lg border border-success/30 bg-success/10 p-5">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+            <p class="text-sm font-medium text-success">Latest check-in recorded</p>
+            <h2 class="mt-1 text-xl font-semibold">
+                {{ latest_record.session_id or "Default session" }}
+            </h2>
+            <p class="mt-2 text-sm text-base-content/70">
+                Checked in at {{ latest_record.checked_in_at }}
+            </p>
+        </div>
+        <div class="text-left sm:text-right">
+            <p class="text-sm text-base-content/70">Recognition confidence</p>
+            <p class="text-3xl font-bold">{{ "%.1f"|format(latest_record.score * 100) }}%</p>
+        </div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-3">
+        <a href="/attendance/{{ latest_record.record_id }}" class="btn btn-primary btn-sm">
+            View details
+        </a>
+        <a href="/check-in" class="btn btn-outline btn-sm">Check in again</a>
+    </div>
+</div>
+
+<h2 class="mb-3 text-lg font-semibold">Recent check-ins</h2>
+<ul class="space-y-3">
+    {% for record in attendance_records %}
+    <li class="flex flex-wrap items-center justify-between gap-4 rounded border border-base-300 bg-base-100 p-4">
+        <div>
+            <p class="font-medium">{{ record.session_id or "Default session" }}</p>
+            <p class="text-sm text-base-content/70">{{ record.checked_in_at }}</p>
+            <p class="mt-1 break-all text-xs text-base-content/60">
+                Face registration: {{ record.face_registration_id }}
+            </p>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="text-right">
+                <p class="text-sm text-base-content/70">Confidence</p>
+                <p class="font-semibold">{{ "%.1f"|format(record.score * 100) }}%</p>
             </div>
+            <a href="/attendance/{{ record.record_id }}" class="btn btn-sm">Details</a>
         </div>
     </li>
     {% endfor %}

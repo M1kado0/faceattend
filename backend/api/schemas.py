@@ -52,7 +52,6 @@ class AttendanceRecord(BaseModel):
     score: float
     checked_in_at: datetime
     created_at: datetime
-    image_thumbnail_url: str | None = None
 
 
 class CheckInResponse(BaseModel):

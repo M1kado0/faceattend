@@ -50,9 +50,10 @@
 
     <div class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
         <div class="mb-5">
-            <h2 class="text-lg font-semibold">Challenge: Blink twice</h2>
+            <h2 class="text-lg font-semibold">Blink challenge registration</h2>
             <p class="mt-2 text-sm text-base-content/70">
-                FaceAttend records a short webcam video, verifies active liveness, then uses a valid frame from that same video for registration.
+                Blink twice in a short webcam video. FaceAttend checks active liveness,
+                checks passive liveness on sampled frames, then stores one verified face template.
             </p>
         </div>
 
@@ -73,9 +74,11 @@
                 {% if not can_register %}disabled{% endif %}
                 onclick="window.startLivenessCapture('/face-registrations', null, { fieldName: 'liveness_video', targetId: 'face-registration-result', durationMs: 4000 })"
             >
-                Start registration
+                Blink twice and register
             </button>
-            <span class="text-sm text-base-content/60">Recording length: 4 seconds</span>
+            <span class="text-sm text-base-content/60">
+                Keep your face close, centered, and in good light.
+            </span>
         </div>
 
         <div id="face-registration-result" class="mt-6"></div>

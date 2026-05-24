@@ -67,6 +67,36 @@ async def verify_passive_liveness(
         reason=data.get("reason"),
     )
 
+async def verify_active_liveness(
+    *,
+    ml_service_url: str,
+    blob: bytes,
+    challenge: str,
+    filename: str = "liveness.webm",
+    content_type: str = "video/webm",
+) -> LivenessCheck:
+    """Call the active liveness endpoint before any biometric embedding work."""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{ml_service_url}/v1/liveness/active",
+                data={"challenge": challenge},
+                files={"blob": (filename, blob, content_type)},
+            )
+            response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise MLServiceRejectedError(exc.response.status_code, exc.response.text) from exc
+    except httpx.RequestError as exc:
+        raise MLServiceUnavailableError("ml_service_unavailable") from exc
+
+    data = response.json()
+    return LivenessCheck(
+        passed=bool(data["passed"]),
+        score=float(data["score"]),
+        label=str(data.get("label", "")),
+        reason=data.get("reason"),
+    )
+
 
 async def embed_image(
     *,

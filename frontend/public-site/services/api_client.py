@@ -46,9 +46,9 @@ class BackendClient:
         liveness_video_content_type: str = "video/webm",
     ) -> dict[str, Any]:
         r = await self._client.post(
-            "/v1/face-registrations",
+            "/v1/face-registrations/",
             files={
-                "liveness_video": (
+                "liveness_blob": (
                     liveness_video_filename,
                     liveness_video,
                     liveness_video_content_type,
@@ -61,7 +61,7 @@ class BackendClient:
 
     async def list_face_registrations(self, *, token: str) -> list[dict]:
         r = await self._client.get(
-            "/v1/face-registrations",
+            "/v1/face-registrations/",
             headers={"Authorization": f"Bearer {token}"},
         )
         r.raise_for_status()
@@ -82,7 +82,7 @@ class BackendClient:
 
     async def list_attendance_records(self, *, token: str) -> list[dict]:
         r = await self._client.get(
-            "/v1/attendance-records",
+            "/v1/attendance-records/",
             headers={"Authorization": f"Bearer {token}"},
         )
         r.raise_for_status()
@@ -91,6 +91,28 @@ class BackendClient:
     async def get_attendance_record(self, *, token: str, record_id: str) -> dict:
         r = await self._client.get(
             f"/v1/attendance-records/{record_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    async def check_in(
+        self,
+        *,
+        liveness_video: bytes,
+        token: str,
+        liveness_video_filename: str = "liveness.webm",
+        liveness_video_content_type: str = "video/webm",
+    ) -> dict:
+        r = await self._client.post(
+            "/v1/check-ins",
+            files={
+                "liveness_blob": (
+                    liveness_video_filename,
+                    liveness_video,
+                    liveness_video_content_type,
+                ),
+            },
             headers={"Authorization": f"Bearer {token}"},
         )
         r.raise_for_status()

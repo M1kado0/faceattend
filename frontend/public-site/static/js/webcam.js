@@ -1,6 +1,12 @@
 // The ONLY JavaScript file in this project. Keep it small and vanilla — no libraries.
-// Responsibility: capture ~4s of webcam video for liveness, submit to the backend,
+// Responsibility: capture webcam media for liveness/registration, submit to the backend,
 // then immediately release the camera. Any feature beyond this should be HTMX.
+
+const USER_CAMERA_CONSTRAINTS = {
+    facingMode: 'user',
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+};
 
 async function startLivenessCapture(targetUrl, onComplete, options = {}) {
     const fieldName = options.fieldName || 'liveness_video';
@@ -14,7 +20,7 @@ async function startLivenessCapture(targetUrl, onComplete, options = {}) {
     }
 
     const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 640, height: 480 },
+        video: USER_CAMERA_CONSTRAINTS,
         audio: false,
     });
     video.srcObject = stream;

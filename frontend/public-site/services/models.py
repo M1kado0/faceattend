@@ -18,8 +18,8 @@ class User(BaseModel):
 
 class AttendanceRecord(BaseModel):
     record_id: str
-    source_url: str
-    source_page: str
+    face_registration_id: str
+    session_id: str | None = None
     score: float
     checked_in_at: datetime
-    image_thumbnail_url: str | None = None
+    created_at: datetime

@@ -10,23 +10,41 @@
             {{ attendance_record.record_id }}
         </p>
     </div>
-    <div class="mb-6">
-        <dt class="font-medium text-base-content/70">Recognition confidence</dt>
-        <dd>{{ "%.3f"|format(attendance_record.score) }}</dd>
+
+    <div class="rounded-lg border border-base-300 bg-base-100 p-5">
+        <dl class="grid gap-5 sm:grid-cols-2">
+            <div>
+                <dt class="font-medium text-base-content/70">Status</dt>
+                <dd class="mt-1 font-semibold text-success">Checked in</dd>
+            </div>
+            <div>
+                <dt class="font-medium text-base-content/70">Recognition confidence</dt>
+                <dd class="mt-1 text-2xl font-bold">
+                    {{ "%.1f"|format(attendance_record.score * 100) }}%
+                </dd>
+            </div>
+            <div>
+                <dt class="font-medium text-base-content/70">Session</dt>
+                <dd class="mt-1 break-all">{{ attendance_record.session_id or "Default session" }}</dd>
+            </div>
+            <div>
+                <dt class="font-medium text-base-content/70">Checked in at</dt>
+                <dd class="mt-1 break-all">{{ attendance_record.checked_in_at }}</dd>
+            </div>
+            <div>
+                <dt class="font-medium text-base-content/70">Face registration</dt>
+                <dd class="mt-1 break-all">{{ attendance_record.face_registration_id }}</dd>
+            </div>
+            <div>
+                <dt class="font-medium text-base-content/70">Record ID</dt>
+                <dd class="mt-1 break-all">{{ attendance_record.record_id }}</dd>
+            </div>
+        </dl>
     </div>
-    <div class="mb-6">
-        <dt class="font-medium text-base-content/70">Record ID</dt>
-        <dd class="break-all">{{ attendance_record.record_id }}</dd>
+
+    <div class="mt-6 flex gap-3">
+        <a href="/attendance" class="btn btn-outline">Back to attendance</a>
+        <a href="/check-in" class="btn btn-primary">Check in again</a>
     </div>
-    <div class="mb-6">
-        <dt class="font-medium text-base-content/70">Session</dt>
-        <dd class="break-all">{{ attendance_record.session_id or "Default session" }}</dd>
-    </div>
-    {% if attendance_record.checked_in_at %}
-    <div class="mb-6">
-        <dt class="font-medium text-base-content/70">Checked in at</dt>
-        <dd class="break-all">{{ attendance_record.checked_in_at }}</dd>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}

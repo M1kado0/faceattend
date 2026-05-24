@@ -16,10 +16,12 @@ from backend.api.ml_client import (
     MLServiceRejectedError,
     MLServiceUnavailableError,
     embed_image,
-    verify_passive_liveness,
+    verify_active_liveness,
 )
 from backend.api.schemas import FaceRegistrationResponse
 from backend.api.services.attendance_record_scan import scan_and_persist_attendance_records
+from backend.api.services.video_liveness import analyze_video_passive_liveness
+from backend.api.video_frames import VideoFrameDecodeError
 from backend.audit.logger import log
 from backend.db.models.face_registration import FaceRegistration
 from backend.db.models.user import User
@@ -29,13 +31,15 @@ from backend.indexer.store import get_store
 load_dotenv()
 ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8003")
 MAX_ACTIVE_FACE_REGISTRATIONS = 3
+PASSIVE_FRAME_SAMPLE_COUNT = int(os.getenv("PASSIVE_FRAME_SAMPLE_COUNT", "10"))
+PASSIVE_LIVENESS_PASS_RATIO = float(os.getenv("PASSIVE_LIVENESS_PASS_RATIO", "0.8"))
+FACE_VISIBLE_RATIO = float(os.getenv("FACE_VISIBLE_RATIO", "0.8"))
 index = get_store()
 router = APIRouter()
 
 
 @router.post("/", response_model=FaceRegistrationResponse)
 async def create_face_registration(
-    photo: UploadFile,
     liveness_blob: UploadFile,
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -64,11 +68,12 @@ async def create_face_registration(
     # AUDIT: liveness must run before embedding to prevent non-consensual face_registration.
     liveness_bytes = await liveness_blob.read()
     try:
-        liveness = await verify_passive_liveness(
+        liveness = await verify_active_liveness(
             ml_service_url=ML_SERVICE_URL,
             blob=liveness_bytes,
-            filename=liveness_blob.filename or "liveness.jpg",
-            content_type=liveness_blob.content_type or "application/octet-stream",
+            challenge="blink_twice",
+            filename=liveness_blob.filename or "liveness.webm",
+            content_type=liveness_blob.content_type or "video/webm",
         )
     except MLServiceRejectedError as exc:
         await log(
@@ -98,13 +103,86 @@ async def create_face_registration(
         )
         raise HTTPException(403, "liveness_failed")
 
-    photo_bytes = await photo.read()
+    try:
+        passive_summary = await analyze_video_passive_liveness(
+            ml_service_url=ML_SERVICE_URL,
+            video=liveness_bytes,
+            max_frames=PASSIVE_FRAME_SAMPLE_COUNT,
+        )
+    except VideoFrameDecodeError as exc:
+        await log(
+            actor_id=user.id,
+            actor_type=user.role,
+            action="face_registration.video_decode_failed",
+            target_id=user.id,
+            metadata={"reason": str(exc)},
+        )
+        raise HTTPException(400, "video_decode_failed") from exc
+    except MLServiceRejectedError as exc:
+        await log(
+            actor_id=user.id,
+            actor_type=user.role,
+            action="face_registration.passive_liveness_rejected",
+            target_id=user.id,
+            metadata={"status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise HTTPException(exc.status_code, exc.detail) from exc
+    except MLServiceUnavailableError as exc:
+        await log(
+            actor_id=user.id,
+            actor_type=user.role,
+            action="face_registration.ml_error",
+            target_id=user.id,
+        )
+        raise HTTPException(503, "ml_service_unavailable") from exc
+
+    await log(
+        actor_id=user.id,
+        actor_type=user.role,
+        action="face_registration.video_passive_liveness_summary",
+        target_id=user.id,
+        metadata={
+            "sampled_frames": passive_summary.sampled_frames,
+            "visible_faces": passive_summary.visible_faces,
+            "passive_passes": passive_summary.passive_passes,
+        },
+    )
+
+    if passive_summary.passive_liveness_pass_ratio < PASSIVE_LIVENESS_PASS_RATIO:
+        await log(
+            actor_id=user.id,
+            actor_type=user.role,
+            action="face_registration.passive_liveness_failed",
+            target_id=user.id,
+            metadata={"passive_liveness_pass_ratio": passive_summary.passive_liveness_pass_ratio},
+        )
+        raise HTTPException(403, "passive_liveness_failed")
+
+    if passive_summary.face_visible_ratio < FACE_VISIBLE_RATIO:
+        await log(
+            actor_id=user.id,
+            actor_type=user.role,
+            action="face_registration.face_not_visible_enough",
+            target_id=user.id,
+            metadata={"face_visible_ratio": passive_summary.face_visible_ratio},
+        )
+        raise HTTPException(403, "face_not_visible_enough")
+
+    if passive_summary.embedding_frame is None:
+        await log(
+            actor_id=user.id,
+            actor_type=user.role,
+            action="face_registration.no_live_embedding_frame",
+            target_id=user.id,
+        )
+        raise HTTPException(403, "passive_liveness_failed")
+
     try:
         result = await embed_image(
             ml_service_url=ML_SERVICE_URL,
-            image=photo_bytes,
-            filename=photo.filename or "photo.jpg",
-            content_type=photo.content_type or "application/octet-stream",
+            image=passive_summary.embedding_frame,
+            filename="liveness-frame.jpg",
+            content_type="image/jpeg",
         )
     except MLServiceRejectedError as exc:
         action = (
