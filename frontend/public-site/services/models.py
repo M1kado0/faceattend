@@ -20,6 +20,15 @@ class AttendanceRecord(BaseModel):
     record_id: str
     face_registration_id: str
     session_id: str | None = None
+    status: Literal["recorded", "duplicate"] = "recorded"
     score: float
     checked_in_at: datetime
+    created_at: datetime
+
+
+class AttendanceSession(BaseModel):
+    session_id: str
+    name: str
+    status: Literal["open", "closed"]
+    starts_at: datetime | None = None
     created_at: datetime

@@ -14,6 +14,7 @@ from backend.api.routes import face_registrations as face_registration_module
 from backend.api.services import attendance_record_scan as attendance_record_scan_module
 from backend.api.services.video_liveness import VideoLivenessSummary
 from backend.db.models.attendance_record import AttendanceRecordRow
+from backend.db.models.attendance_session import AttendanceSessionRow
 from backend.db.models.face_registration import FaceRegistration
 from backend.db.models.user import User
 from backend.indexer.store import Match
@@ -124,6 +125,14 @@ def _passing_video_summary() -> VideoLivenessSummary:
     )
 
 
+def _attendance_session() -> AttendanceSessionRow:
+    return AttendanceSessionRow(
+        id="session-1",
+        user_id="user-1",
+        name="Demo Attendance Session",
+    )
+
+
 @pytest.fixture
 def user() -> User:
     return User(id="user-1", email="user@example.com", hashed_password="hash", role="user")
@@ -212,7 +221,7 @@ async def test_enroll_indexes_only_after_passed_liveness(monkeypatch, user) -> N
     response = await face_registration_module.create_face_registration(
         liveness_blob=_upload("live.webm"), user=user, session=session
     )
-    assert len(session.added) == 2
+    assert len(session.added) == 1
     face_registration = next(obj for obj in session.added if isinstance(obj, FaceRegistration))
 
     assert response.embedding_model_version == "arcface-r100-v1"
@@ -390,9 +399,10 @@ async def test_check_in_filters_by_embedding_model_after_liveness(monkeypatch, u
     monkeypatch.setattr(attendance_record_scan_module, "log", fake_log)
     monkeypatch.setattr(attendance_record_scan_module, "index", index)
 
-    session = FakeSession()
+    session = FakeSession(execute_results=[FakeExecuteResult(one=_attendance_session())])
     response = await check_in_module.check_in(
         liveness_blob=_upload("live.webm"),
+        session_id="session-1",
         user=user,
         session=session,
     )
@@ -402,6 +412,7 @@ async def test_check_in_filters_by_embedding_model_after_liveness(monkeypatch, u
     assert response.attendance_records[0].record_id == attendance_record.id
     assert attendance_record.user_id == user.id
     assert attendance_record.face_registration_id == "registration-1"
+    assert attendance_record.session_id == "session-1"
     assert session.commit_count == 1
     assert len(index.searched) == 3
     assert index.searched[0][2] == {
@@ -417,6 +428,7 @@ async def test_check_in_reuses_existing_persisted_match(monkeypatch, user) -> No
         id="persisted-record-1",
         user_id=user.id,
         face_registration_id="registration-1",
+        session_id="session-1",
         score=0.9,
         checked_in_at=datetime.utcnow(),
         created_at=datetime.utcnow(),
@@ -449,9 +461,15 @@ async def test_check_in_reuses_existing_persisted_match(monkeypatch, user) -> No
     monkeypatch.setattr(attendance_record_scan_module, "log", fake_log)
     monkeypatch.setattr(attendance_record_scan_module, "index", index)
 
-    session = FakeSession(execute_results=[FakeExecuteResult(one=existing_record)])
+    session = FakeSession(
+        execute_results=[
+            FakeExecuteResult(one=_attendance_session()),
+            FakeExecuteResult(one=existing_record),
+        ]
+    )
     response = await check_in_module.check_in(
         liveness_blob=_upload("live.webm"),
+        session_id="session-1",
         user=user,
         session=session,
     )
@@ -494,10 +512,11 @@ async def test_check_in_rejects_failed_video_passive_liveness(monkeypatch, user)
     )
     monkeypatch.setattr(check_in_module, "embed_image", fake_embed)
 
-    session = FakeSession()
+    session = FakeSession(execute_results=[FakeExecuteResult(one=_attendance_session())])
     with pytest.raises(Exception) as exc_info:
         await check_in_module.check_in(
             liveness_blob=_upload("live.webm"),
+            session_id="session-1",
             user=user,
             session=session,
         )
@@ -538,10 +557,11 @@ async def test_check_in_rejects_low_face_visible_ratio(monkeypatch, user) -> Non
     )
     monkeypatch.setattr(check_in_module, "embed_image", fake_embed)
 
-    session = FakeSession()
+    session = FakeSession(execute_results=[FakeExecuteResult(one=_attendance_session())])
     with pytest.raises(Exception) as exc_info:
         await check_in_module.check_in(
             liveness_blob=_upload("live.webm"),
+            session_id="session-1",
             user=user,
             session=session,
         )
@@ -585,10 +605,11 @@ async def test_check_in_rejects_identity_mismatch(monkeypatch, user) -> None:
         fake_scan_best,
     )
 
-    session = FakeSession()
+    session = FakeSession(execute_results=[FakeExecuteResult(one=_attendance_session())])
     with pytest.raises(Exception) as exc_info:
         await check_in_module.check_in(
             liveness_blob=_upload("live.webm"),
+            session_id="session-1",
             user=user,
             session=session,
         )
@@ -670,6 +691,7 @@ async def test_check_in_persists_best_match_across_live_frame_embeddings(monkeyp
         ],
         model_version="arcface-r100-v1",
         session=session,
+        attendance_session_id="session-1",
     )
 
     assert len(index.searched) == 3

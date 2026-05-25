@@ -23,10 +23,13 @@ async def list_attendance_records(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
     since: datetime | None = None,
+    session_id: str | None = None,
 ) -> list[AttendanceRecord]:
     statement = select(AttendanceRecordRow).where(AttendanceRecordRow.user_id == user.id)
     if since is not None:
         statement = statement.where(AttendanceRecordRow.created_at >= since)
+    if session_id:
+        statement = statement.where(AttendanceRecordRow.session_id == session_id)
     statement = statement.order_by(
         AttendanceRecordRow.created_at.desc(),
         AttendanceRecordRow.score.desc(),
@@ -38,6 +41,7 @@ async def list_attendance_records(
             record_id=record.id,
             face_registration_id=record.face_registration_id,
             session_id=record.session_id,
+            status="recorded",
             score=record.score,
             checked_in_at=record.checked_in_at,
             created_at=record.created_at,
@@ -65,6 +69,7 @@ async def get_attendance_record(
         record_id=record.id,
         face_registration_id=record.face_registration_id,
         session_id=record.session_id,
+        status="recorded",
         score=record.score,
         checked_in_at=record.checked_in_at,
         created_at=record.created_at,

@@ -19,7 +19,6 @@ from backend.api.ml_client import (
     verify_active_liveness,
 )
 from backend.api.schemas import FaceRegistrationResponse
-from backend.api.services.attendance_record_scan import scan_and_persist_attendance_records
 from backend.api.services.video_liveness import analyze_video_passive_liveness
 from backend.api.video_frames import VideoFrameDecodeError
 from backend.audit.logger import log
@@ -257,14 +256,6 @@ async def create_face_registration(
         actor_type=user.role,
         action="face_registration.success",
         target_id=user.id,
-    )
-
-    await scan_and_persist_attendance_records(
-        user=user,
-        embedding=result.embedding,
-        model_version=result.model_version,
-        session=session,
-        top_k=10,
     )
 
     return FaceRegistrationResponse(

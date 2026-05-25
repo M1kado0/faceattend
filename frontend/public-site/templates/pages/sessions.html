@@ -10,17 +10,43 @@
             Open a session for students or team members to check in with liveness.
         </p>
     </div>
-    <button class="btn btn-primary" type="button" disabled>Create session</button>
 </div>
 
+<form
+    class="mb-6 flex flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:flex-row"
+    hx-post="/sessions"
+    hx-target="#session-result"
+    hx-swap="innerHTML"
+>
+    <label class="form-control flex-1">
+        <span class="label-text font-medium">Session name</span>
+        <input
+            class="input input-bordered"
+            name="name"
+            type="text"
+            maxlength="120"
+            required
+            placeholder="CS101 Monday"
+        >
+    </label>
+    <div class="flex items-end">
+        <button class="btn btn-primary w-full sm:w-auto" type="submit">Create session</button>
+    </div>
+</form>
+<div id="session-result"></div>
+
+{% if not sessions %}
+<div role="alert" class="alert">
+    <span>No sessions yet. Create one before using check-in.</span>
+</div>
+{% else %}
 <div class="overflow-x-auto rounded-lg border border-base-300 bg-base-100 shadow-sm">
     <table class="table">
         <thead>
             <tr>
                 <th>Session</th>
-                <th>Time</th>
                 <th>Status</th>
-                <th>Attendance</th>
+                <th>Created</th>
                 <th></th>
             </tr>
         </thead>
@@ -28,16 +54,16 @@
             {% for session in sessions %}
             <tr>
                 <td class="font-medium">{{ session.name }}</td>
-                <td>{{ session.time }}</td>
                 <td><span class="badge badge-success">{{ session.status }}</span></td>
-                <td>{{ session.present }} / {{ session.expected }}</td>
+                <td>{{ session.created_at }}</td>
                 <td class="text-right">
-                    <a href="/check-in" class="btn btn-primary btn-sm">Take attendance</a>
-                    <a href="/attendance" class="btn btn-outline btn-sm">View results</a>
+                    <a href="/check-in?session_id={{ session.session_id }}" class="btn btn-primary btn-sm">Take attendance</a>
+                    <a href="/attendance?session_id={{ session.session_id }}" class="btn btn-outline btn-sm">View results</a>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+{% endif %}
 {% endblock %}

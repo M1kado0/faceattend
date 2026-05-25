@@ -16,49 +16,54 @@
         <span>Register your face before checking in.</span>
         <a href="/face-registration" class="btn btn-primary btn-sm">Register face</a>
     </div>
+    {% elif not attendance_sessions %}
+    <div role="alert" class="alert mb-6">
+        <span>Create an attendance session before checking in.</span>
+        <a href="/sessions" class="btn btn-primary btn-sm">Create session</a>
+    </div>
     {% endif %}
 
-    <div class="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
-        <section class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <section>
             <h2 class="text-lg font-semibold">Blink challenge</h2>
             <p class="mt-2 text-sm text-base-content/70">
                 Record one short video. FaceAttend checks active liveness, passive liveness on sampled frames,
                 then matches a verified frame against your registered face template.
             </p>
 
-            <div class="mt-5 aspect-video overflow-hidden rounded-lg bg-base-300">
-                <video
-                    id="webcam-preview"
-                    class="h-full w-full object-cover"
-                    autoplay
-                    muted
-                    playsinline
-                ></video>
-            </div>
+            <label class="form-control mt-5 w-full">
+                <span class="label-text font-medium">Attendance session</span>
+                <select id="attendance-session-id" class="select select-bordered" {% if not attendance_sessions %}disabled{% endif %}>
+                    {% for session in attendance_sessions %}
+                    <option
+                        value="{{ session.session_id }}"
+                        {% if selected_session_id == session.session_id or (not selected_session_id and loop.first) %}selected{% endif %}
+                    >
+                        {{ session.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
 
-            <div class="mt-5 flex flex-wrap gap-3">
-                <button
-                    class="btn btn-primary"
-                    type="button"
-                    {% if not has_registration %}disabled{% endif %}
-                    onclick="window.startLivenessCapture('/check-in', null, { fieldName: 'liveness_video', targetId: 'check-in-result', durationMs: 4000 })"
-                >
-                    Blink twice and check in
-                </button>
-                <a href="/attendance" class="btn btn-outline">View results</a>
+            <div class="mt-5">
+                {% with liveness_start_url="/check-in", result_id="check-in-result", button_text="Blink twice and check in", can_start=has_registration and attendance_sessions, session_select_id="attendance-session-id" %}
+                    {% include "partials/liveness_camera.html" %}
+                {% endwith %}
             </div>
-            <p class="mt-3 text-xs text-base-content/60">
-                Blink challenge records for 4 seconds. Keep your face close and look at the camera.
-            </p>
-            <div id="check-in-result" class="mt-6"></div>
         </section>
 
-        <aside class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
+        <aside class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm">
             <h2 class="text-lg font-semibold">Selected session</h2>
             <dl class="mt-4 space-y-3 text-sm">
                 <div>
                     <dt class="font-medium text-base-content/70">Session</dt>
-                    <dd>Demo Attendance Session</dd>
+                    <dd>
+                        {% if attendance_sessions %}
+                            Choose from {{ attendance_sessions|length }} open session{% if attendance_sessions|length != 1 %}s{% endif %}
+                        {% else %}
+                            No open sessions
+                        {% endif %}
+                    </dd>
                 </div>
                 <div>
                     <dt class="font-medium text-base-content/70">Challenge</dt>
@@ -69,6 +74,7 @@
                     <dd>Active liveness, passive liveness, face recognition</dd>
                 </div>
             </dl>
+            <a href="/attendance" class="btn btn-outline btn-sm mt-5 w-full">View results</a>
         </aside>
     </div>
 </div>

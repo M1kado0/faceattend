@@ -1,7 +1,22 @@
+import os
 from logging.config import fileConfig
 
 from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
+from sqlmodel import SQLModel
+
+from backend.db.models import (
+    api_key,
+    attendance_record,
+    attendance_session,
+    audit_log,
+    cluster,
+    face_registration,
+    takedown,
+    user,
+    webhook,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -16,29 +31,12 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from sqlmodel import SQLModel
-
-from backend.db.models import (
-    api_key,
-    audit_log,
-    attendance_record,
-    cluster,
-    face_registration,
-    takedown,
-    user,
-    webhook,
-)
-
 target_metadata = SQLModel.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-
-import os
-
-from dotenv import load_dotenv
 
 load_dotenv()
 config.set_main_option("sqlalchemy.url", os.getenv("ALEMBIC_DATABASE_URL"))

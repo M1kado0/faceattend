@@ -25,6 +25,7 @@ async def scan_and_persist_attendance_records(
     embedding: np.ndarray,
     model_version: str,
     session: AsyncSession,
+    attendance_session_id: str | None = None,
     top_k: int = 10,
 ) -> list[AttendanceRecord]:
     try:
@@ -58,6 +59,7 @@ async def scan_and_persist_attendance_records(
             select(AttendanceRecordRow).where(
                 AttendanceRecordRow.user_id == user.id,
                 AttendanceRecordRow.face_registration_id.in_(embedding_ids),
+                AttendanceRecordRow.session_id == attendance_session_id,
             )
         )
         existing_records_by_registration_id = {
@@ -72,12 +74,13 @@ async def scan_and_persist_attendance_records(
         checked_in_at = metadata.get("checked_in_at", check_in_created_at)
 
         attendance_record = existing_records_by_registration_id.get(vector_result.embedding_id)
+        attendance_status = "duplicate"
         if attendance_record is None:
             attendance_record = AttendanceRecordRow(
                 id=str(uuid.uuid4()),
                 user_id=user.id,
                 face_registration_id=vector_result.embedding_id,
-                session_id=metadata.get("session_id"),
+                session_id=attendance_session_id,
                 score=float(vector_result.score),
                 checked_in_at=checked_in_at,
                 notified_at=None,
@@ -85,12 +88,14 @@ async def scan_and_persist_attendance_records(
             )
             session.add(attendance_record)
             has_new_records = True
+            attendance_status = "recorded"
 
         attendance_records.append(
             AttendanceRecord(
                 record_id=attendance_record.id,
                 face_registration_id=attendance_record.face_registration_id,
                 session_id=attendance_record.session_id,
+                status=attendance_status,
                 score=attendance_record.score,
                 checked_in_at=attendance_record.checked_in_at,
                 created_at=attendance_record.created_at,
@@ -119,6 +124,7 @@ async def scan_best_and_persist_attendance_record(
     embeddings: list[np.ndarray],
     model_version: str,
     session: AsyncSession,
+    attendance_session_id: str,
     top_k: int = 10,
 ) -> list[AttendanceRecord]:
     """Search several live-frame embeddings and persist only the strongest match."""
@@ -162,6 +168,7 @@ async def scan_best_and_persist_attendance_record(
         select(AttendanceRecordRow).where(
             AttendanceRecordRow.user_id == user.id,
             AttendanceRecordRow.face_registration_id == best_result.embedding_id,
+            AttendanceRecordRow.session_id == attendance_session_id,
         )
     )
     existing_record = existing_result.scalar_one_or_none()
@@ -173,7 +180,7 @@ async def scan_best_and_persist_attendance_record(
             id=str(uuid.uuid4()),
             user_id=user.id,
             face_registration_id=best_result.embedding_id,
-            session_id=metadata.get("session_id"),
+            session_id=attendance_session_id,
             score=float(best_result.score),
             checked_in_at=metadata.get("checked_in_at", check_in_created_at),
             notified_at=None,
@@ -193,6 +200,9 @@ async def scan_best_and_persist_attendance_record(
             raise HTTPException(500, "attendance_record_persist_error") from exc
     else:
         attendance_record = existing_record
+        attendance_status = "duplicate"
+    if existing_record is None:
+        attendance_status = "recorded"
 
     await log(
         actor_id=user.id,
@@ -206,6 +216,7 @@ async def scan_best_and_persist_attendance_record(
             record_id=attendance_record.id,
             face_registration_id=attendance_record.face_registration_id,
             session_id=attendance_record.session_id,
+            status=attendance_status,
             score=attendance_record.score,
             checked_in_at=attendance_record.checked_in_at,
             created_at=attendance_record.created_at,

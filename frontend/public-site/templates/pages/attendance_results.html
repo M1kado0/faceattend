@@ -10,10 +10,41 @@
     </p>
 </div>
 
+<div class="mb-6 flex flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:flex-row sm:items-end">
+    <label class="form-control flex-1">
+        <span class="label-text font-medium">Filter by session</span>
+        <select class="select select-bordered" onchange="window.location.href = this.value">
+            <option value="/attendance">All sessions</option>
+            {% for session in attendance_sessions %}
+            <option
+                value="/attendance?session_id={{ session.session_id }}"
+                {% if selected_session_id == session.session_id %}selected{% endif %}
+            >
+                {{ session.name }}
+            </option>
+            {% endfor %}
+        </select>
+    </label>
+    <a
+        class="btn btn-outline"
+        href="/attendance.csv{% if selected_session_id %}?session_id={{ selected_session_id }}{% endif %}"
+    >
+        Export CSV
+    </a>
+    <a class="btn btn-primary" href="/check-in{% if selected_session_id %}?session_id={{ selected_session_id }}{% endif %}">
+        Check in
+    </a>
+</div>
+
 {% if not has_face_registrations %}
 <div role="alert" class="alert">
     <span>Register your face before checking in to attendance sessions.</span>
     <a href="/face-registration" class="btn btn-primary btn-sm">Register face</a>
+</div>
+{% elif not attendance_sessions %}
+<div role="alert" class="alert">
+    <span>Create an attendance session before checking in.</span>
+    <a href="/sessions" class="btn btn-primary btn-sm">Create session</a>
 </div>
 {% elif not attendance_records %}
 <div role="alert" class="alert">
@@ -28,11 +59,16 @@
         <div>
             <p class="text-sm font-medium text-success">Latest check-in recorded</p>
             <h2 class="mt-1 text-xl font-semibold">
-                {{ latest_record.session_id or "Default session" }}
+                {{ session_name_by_id.get(latest_record.session_id, latest_record.session_id or "Default session") }}
             </h2>
             <p class="mt-2 text-sm text-base-content/70">
                 Checked in at {{ latest_record.checked_in_at }}
             </p>
+            {% if latest_record.status == "duplicate" %}
+            <span class="badge badge-warning mt-3">Already checked in</span>
+            {% else %}
+            <span class="badge badge-success mt-3">Recorded</span>
+            {% endif %}
         </div>
         <div class="text-left sm:text-right">
             <p class="text-sm text-base-content/70">Recognition confidence</p>
@@ -52,8 +88,17 @@
     {% for record in attendance_records %}
     <li class="flex flex-wrap items-center justify-between gap-4 rounded border border-base-300 bg-base-100 p-4">
         <div>
-            <p class="font-medium">{{ record.session_id or "Default session" }}</p>
+            <p class="font-medium">
+                {{ session_name_by_id.get(record.session_id, record.session_id or "Default session") }}
+            </p>
             <p class="text-sm text-base-content/70">{{ record.checked_in_at }}</p>
+            <p class="mt-1">
+                {% if record.status == "duplicate" %}
+                <span class="badge badge-warning">Duplicate</span>
+                {% else %}
+                <span class="badge badge-success">Recorded</span>
+                {% endif %}
+            </p>
             <p class="mt-1 break-all text-xs text-base-content/60">
                 Face registration: {{ record.face_registration_id }}
             </p>

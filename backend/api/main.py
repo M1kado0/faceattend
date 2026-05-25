@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from backend.api.routes import (
     attendance_records,
+    attendance_sessions,
     auth,
     billing,
     check_ins,
@@ -31,6 +32,11 @@ app.include_router(
     attendance_records.router,
     prefix="/v1/attendance-records",
     tags=["attendance-records"],
+)
+app.include_router(
+    attendance_sessions.router,
+    prefix="/v1/attendance-sessions",
+    tags=["attendance-sessions"],
 )
 app.include_router(check_ins.router, prefix="/v1", tags=["check-ins"])
 app.include_router(notifications.router, prefix="/v1/notifications", tags=["notifications"])

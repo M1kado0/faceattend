@@ -80,9 +80,16 @@ class BackendClient:
         r.raise_for_status()
         return r.json()
 
-    async def list_attendance_records(self, *, token: str) -> list[dict]:
+    async def list_attendance_records(
+        self,
+        *,
+        token: str,
+        session_id: str | None = None,
+    ) -> list[dict]:
+        params = {"session_id": session_id} if session_id else None
         r = await self._client.get(
             "/v1/attendance-records/",
+            params=params,
             headers={"Authorization": f"Bearer {token}"},
         )
         r.raise_for_status()
@@ -100,6 +107,7 @@ class BackendClient:
         self,
         *,
         liveness_video: bytes,
+        session_id: str,
         token: str,
         liveness_video_filename: str = "liveness.webm",
         liveness_video_content_type: str = "video/webm",
@@ -113,6 +121,24 @@ class BackendClient:
                     liveness_video_content_type,
                 ),
             },
+            data={"session_id": session_id},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    async def list_attendance_sessions(self, *, token: str) -> list[dict]:
+        r = await self._client.get(
+            "/v1/attendance-sessions/",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    async def create_attendance_session(self, *, token: str, name: str) -> dict:
+        r = await self._client.post(
+            "/v1/attendance-sessions/",
+            json={"name": name},
             headers={"Authorization": f"Bearer {token}"},
         )
         r.raise_for_status()

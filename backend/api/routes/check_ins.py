@@ -7,7 +7,8 @@ import uuid
 from typing import Annotated
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.dependencies import get_current_user
@@ -23,6 +24,7 @@ from backend.api.services.attendance_record_scan import scan_best_and_persist_at
 from backend.api.services.video_liveness import analyze_video_passive_liveness
 from backend.api.video_frames import VideoFrameDecodeError
 from backend.audit.logger import log
+from backend.db.models.attendance_session import AttendanceSessionRow
 from backend.db.models.user import User
 from backend.db.session import get_session
 
@@ -39,10 +41,28 @@ router = APIRouter()
 @router.post("/check-ins", response_model=CheckInResponse)
 async def check_in(
     liveness_blob: UploadFile,
+    session_id: Annotated[str, Form()],
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> CheckInResponse:
     await log(actor_id=user.id, actor_type=user.role, action="check_in.attempt", target_id=user.id)
+
+    session_result = await session.execute(
+        select(AttendanceSessionRow).where(
+            AttendanceSessionRow.id == session_id,
+            AttendanceSessionRow.user_id == user.id,
+            AttendanceSessionRow.status == "open",
+        )
+    )
+    attendance_session = session_result.scalar_one_or_none()
+    if attendance_session is None:
+        await log(
+            actor_id=user.id,
+            actor_type=user.role,
+            action="check_in.attendance_session_not_found",
+            target_id=session_id,
+        )
+        raise HTTPException(status_code=404, detail="attendance_session_not_found")
 
     # AUDIT: liveness must run before embedding to prevent stalking use.
     liveness_bytes = await liveness_blob.read()
@@ -189,6 +209,7 @@ async def check_in(
         embeddings=[result.embedding for result in embedding_results],
         model_version=model_version,
         session=session,
+        attendance_session_id=attendance_session.id,
         top_k=1,
     )
     if not attendance_records:

@@ -68,13 +68,16 @@ class FakeFaceRegistrationClient:
 @dataclass
 class FakeAttendanceClient:
     face_registration_result: list[dict] | None = None
+    session_result: list[dict] | None = None
     list_result: list[dict] | None = None
     detail_result: dict | None = None
     check_in_result: dict | None = None
     face_registration_error: Exception | None = None
+    session_error: Exception | None = None
     list_error: Exception | None = None
     detail_error: Exception | None = None
     check_in_error: Exception | None = None
+    created_session_name: str | None = None
 
     async def list_face_registrations(self, **kwargs) -> list[dict]:
         if self.face_registration_error is not None:
@@ -100,6 +103,7 @@ class FakeAttendanceClient:
                 "record_id": "record-1",
                 "face_registration_id": "registration-1",
                 "session_id": "session-1",
+                "status": "recorded",
                 "score": 0.91,
                 "checked_in_at": "2026-05-18T00:00:00Z",
                 "created_at": "2026-05-18T00:00:00Z",
@@ -113,6 +117,7 @@ class FakeAttendanceClient:
             "record_id": "record-1",
             "face_registration_id": "registration-1",
             "session_id": "session-1",
+            "status": "recorded",
             "score": 0.91,
             "checked_in_at": "2026-05-18T00:00:00Z",
             "created_at": "2026-05-18T00:00:00Z",
@@ -121,6 +126,7 @@ class FakeAttendanceClient:
     async def check_in(self, **kwargs) -> dict:
         if self.check_in_error is not None:
             raise self.check_in_error
+        assert kwargs["session_id"] == "session-1"
         return self.check_in_result or {
             "query_id": "query-1",
             "attendance_records": [
@@ -128,11 +134,39 @@ class FakeAttendanceClient:
                     "record_id": "record-1",
                     "face_registration_id": "registration-1",
                     "session_id": "session-1",
+                    "status": "recorded",
                     "score": 0.91,
                     "checked_in_at": "2026-05-18T00:00:00Z",
                     "created_at": "2026-05-18T00:00:00Z",
                 }
             ],
+        }
+
+    async def list_attendance_sessions(self, **kwargs) -> list[dict]:
+        if self.session_error is not None:
+            raise self.session_error
+        if self.session_result is not None:
+            return self.session_result
+        return [
+            {
+                "session_id": "session-1",
+                "name": "Demo Attendance Session",
+                "status": "open",
+                "starts_at": None,
+                "created_at": "2026-05-18T00:00:00Z",
+            }
+        ]
+
+    async def create_attendance_session(self, **kwargs) -> dict:
+        if self.session_error is not None:
+            raise self.session_error
+        self.created_session_name = kwargs["name"]
+        return {
+            "session_id": "session-new",
+            "name": kwargs["name"],
+            "status": "open",
+            "starts_at": None,
+            "created_at": "2026-05-18T00:00:00Z",
         }
 
 
@@ -209,6 +243,9 @@ def test_face_registration_page_shows_existing_face_registrations(client, monkey
     assert response.status_code == 200
     assert "Registered face templates" in response.text
     assert "arcface-r100-v1" in response.text
+    assert "Camera is idle" in response.text
+    assert 'data-liveness-phase="face"' in response.text
+    assert 'data-liveness-phase="blink"' in response.text
 
 
 def test_face_registration_page_disables_form_at_face_registration_limit(
@@ -273,6 +310,19 @@ def test_check_in_page_shows_registration_prompt_without_face_registration(
     assert "Register your face before checking in." in response.text
 
 
+def test_check_in_page_shows_live_liveness_guidance(client, monkeypatch) -> None:
+    attendance_module = pytest.importorskip("routers.attendance")
+    monkeypatch.setattr(attendance_module, "backend_client", FakeAttendanceClient())
+    client.cookies.set("session_token", "token")
+
+    response = client.get("/check-in")
+
+    assert response.status_code == 200
+    assert "Camera is idle" in response.text
+    assert "liveness-face-guide" in response.text
+    assert 'data-liveness-phase="upload"' in response.text
+
+
 def test_check_in_without_session_returns_login_required(client) -> None:
     response = client.post("/check-in", files=_check_in_files())
 
@@ -285,7 +335,11 @@ def test_successful_check_in_redirects_to_attendance(client, monkeypatch) -> Non
     monkeypatch.setattr(attendance_module, "backend_client", FakeAttendanceClient())
     client.cookies.set("session_token", "token")
 
-    response = client.post("/check-in", files=_check_in_files())
+    response = client.post(
+        "/check-in",
+        data={"session_id": "session-1"},
+        files=_check_in_files(),
+    )
 
     assert response.status_code == 204
     assert response.headers["HX-Redirect"] == "/attendance"
@@ -300,7 +354,11 @@ def test_check_in_liveness_failure_returns_liveness_partial(client, monkeypatch)
     )
     client.cookies.set("session_token", "token")
 
-    response = client.post("/check-in", files=_check_in_files())
+    response = client.post(
+        "/check-in",
+        data={"session_id": "session-1"},
+        files=_check_in_files(),
+    )
 
     assert response.status_code == 200
     assert "Liveness check failed" in response.text
@@ -315,19 +373,40 @@ def test_check_in_identity_mismatch_returns_warning_partial(client, monkeypatch)
     )
     client.cookies.set("session_token", "token")
 
-    response = client.post("/check-in", files=_check_in_files())
+    response = client.post(
+        "/check-in",
+        data={"session_id": "session-1"},
+        files=_check_in_files(),
+    )
 
     assert response.status_code == 200
-    assert "Face not recognized" in response.text
-    assert "not recorded" in response.text
+    assert "Face does not match this account" in response.text
+    assert "Check-in was not recorded" in response.text
 
 
-def test_sessions_page_shows_attendance_session(client) -> None:
+def test_sessions_page_shows_attendance_session(client, monkeypatch) -> None:
+    attendance_module = pytest.importorskip("routers.attendance")
+    monkeypatch.setattr(attendance_module, "backend_client", FakeAttendanceClient())
+    client.cookies.set("session_token", "token")
+
     response = client.get("/sessions")
 
     assert response.status_code == 200
     assert "Attendance sessions" in response.text
     assert "Demo Attendance Session" in response.text
+
+
+def test_create_session_redirects_to_sessions(client, monkeypatch) -> None:
+    attendance_module = pytest.importorskip("routers.attendance")
+    fake_client = FakeAttendanceClient()
+    monkeypatch.setattr(attendance_module, "backend_client", fake_client)
+    client.cookies.set("session_token", "token")
+
+    response = client.post("/sessions", data={"name": "CS101 Monday"})
+
+    assert response.status_code == 204
+    assert response.headers["HX-Redirect"] == "/sessions"
+    assert fake_client.created_session_name == "CS101 Monday"
 
 
 def test_reports_page_shows_attendance_reports(client) -> None:
@@ -354,6 +433,8 @@ def test_successful_attendance_list_returns_results_page(client, monkeypatch) ->
     assert response.status_code == 200
     assert "Latest check-in recorded" in response.text
     assert "Recent check-ins" in response.text
+    assert "Export CSV" in response.text
+    assert "Recorded" in response.text
     assert "record-1" in response.text
     assert "registration-1" in response.text
 

@@ -45,10 +45,24 @@ class FaceRegistrationResponse(BaseModel):
     embedding_model_version: str
 
 
+class AttendanceSessionCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    starts_at: datetime | None = None
+
+
+class AttendanceSession(BaseModel):
+    session_id: str
+    name: str
+    status: Literal["open", "closed"]
+    starts_at: datetime | None = None
+    created_at: datetime
+
+
 class AttendanceRecord(BaseModel):
     record_id: str
     face_registration_id: str
     session_id: str | None = None
+    status: Literal["recorded", "duplicate"] = "recorded"
     score: float
     checked_in_at: datetime
     created_at: datetime

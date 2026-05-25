@@ -1,0 +1,44 @@
+<div class="mx-auto max-w-md">
+    <div class="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
+        <div class="relative aspect-[3/4] bg-neutral">
+            <video
+                id="webcam-preview"
+                class="h-full w-full object-cover"
+                autoplay
+                muted
+                playsinline
+            ></video>
+            <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div
+                    id="liveness-face-guide"
+                    class="h-[58%] w-[70%] rounded-[50%] border-4 border-white/85 shadow-[0_0_0_9999px_rgba(0,0,0,0.42)]"
+                    aria-hidden="true"
+                ></div>
+            </div>
+            <div class="pointer-events-none absolute inset-x-4 top-4">
+                <div id="liveness-guidance" class="rounded-lg bg-black/65 px-4 py-3 text-center text-sm font-semibold text-white backdrop-blur">
+                    Camera is idle
+                </div>
+            </div>
+            <div id="liveness-phases" class="absolute inset-x-4 bottom-4 grid grid-cols-3 gap-2 text-center text-xs font-semibold">
+                <div data-liveness-phase="face" class="rounded-full bg-white/20 px-3 py-2 text-white/70 backdrop-blur">Face</div>
+                <div data-liveness-phase="blink" class="rounded-full bg-white/20 px-3 py-2 text-white/70 backdrop-blur">Blink</div>
+                <div data-liveness-phase="upload" class="rounded-full bg-white/20 px-3 py-2 text-white/70 backdrop-blur">Upload</div>
+            </div>
+        </div>
+        <div class="space-y-4 p-4">
+            <button
+                class="btn btn-primary w-full"
+                type="button"
+                {% if not can_start %}disabled{% endif %}
+                onclick="window.startLivenessCapture('{{ liveness_start_url }}', null, { fieldName: 'liveness_video', targetId: '{{ result_id }}', durationMs: 4000{% if session_select_id is defined %}, sessionSelectId: '{{ session_select_id }}'{% endif %} })"
+            >
+                {{ button_text }}
+            </button>
+            <p class="text-center text-xs text-base-content/60">
+                Center your face inside the oval. Recording starts after a short countdown.
+            </p>
+            <div id="{{ result_id }}"></div>
+        </div>
+    </div>
+</div>

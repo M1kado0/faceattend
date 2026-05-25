@@ -57,31 +57,9 @@
             </p>
         </div>
 
-        <div class="aspect-video overflow-hidden rounded-lg bg-base-300">
-            <video
-                id="webcam-preview"
-                class="h-full w-full object-cover"
-                autoplay
-                muted
-                playsinline
-            ></video>
-        </div>
-
-        <div class="mt-5 flex flex-wrap items-center gap-3">
-            <button
-                type="button"
-                class="btn btn-primary"
-                {% if not can_register %}disabled{% endif %}
-                onclick="window.startLivenessCapture('/face-registrations', null, { fieldName: 'liveness_video', targetId: 'face-registration-result', durationMs: 4000 })"
-            >
-                Blink twice and register
-            </button>
-            <span class="text-sm text-base-content/60">
-                Keep your face close, centered, and in good light.
-            </span>
-        </div>
-
-        <div id="face-registration-result" class="mt-6"></div>
+        {% with liveness_start_url="/face-registrations", result_id="face-registration-result", button_text="Blink twice and register", can_start=can_register %}
+            {% include "partials/liveness_camera.html" %}
+        {% endwith %}
     </div>
 </div>
 {% endblock %}

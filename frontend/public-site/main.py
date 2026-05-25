@@ -32,26 +32,6 @@ async def index(request: Request):
     )
 
 
-@app.get("/sessions", response_class=HTMLResponse)
-async def sessions_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="pages/sessions.html",
-        context={
-            "sessions": [
-                {
-                    "id": "session-demo",
-                    "name": "Demo Attendance Session",
-                    "time": "Today",
-                    "status": "Open",
-                    "present": 0,
-                    "expected": 0,
-                }
-            ]
-        },
-    )
-
-
 @app.get("/reports", response_class=HTMLResponse)
 async def reports_page(request: Request):
     return templates.TemplateResponse(
