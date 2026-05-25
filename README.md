@@ -1,77 +1,111 @@
-# FaceAttend — Liveness-Gated Face Attendance System
+# FaceAttend
 
-> FaceAttend is a Python-first attendance system that uses face registration, face recognition, and active/passive liveness checks to record attendance while reducing spoofing and proxy check-ins.
+FaceAttend is a Python-first attendance system with webcam face registration,
+face recognition, and active/passive liveness checks.
 
----
-
-## Overview
-
-FaceAttend is built around a controlled attendance flow:
-
-1. **Register a person** with explicit consent and a face photo.
-2. **Verify liveness at registration** so a printed photo or screen replay cannot be enrolled.
-3. **Store face embeddings**, not raw face crops, for recognition.
-4. **Create attendance sessions** for classes, labs, events, meetings, or workplace shifts.
-5. **Verify liveness at check-in** using active and passive checks.
-6. **Match the live face** against registered embeddings.
-7. **Record attendance** with timestamp, session, confidence score, and audit trail.
-
-The web surface is a **server-rendered FastAPI site** for registration, check-in, session management, and attendance review.
-
-The web app renders server-side HTML using **Jinja2** templates with **HTMX** for interactivity. No React, no TypeScript, no build step. Pure Python end-to-end.
-
----
-
-## Why Active And Passive Liveness?
-
-Face attendance systems are easy to abuse if they only compare a face image against a database. Someone could hold up a printed photo, replay a video, or use another person’s image.
-
-- **Passive liveness** analyzes a still image or short clip for spoofing signals such as printed photos, screens, masks, or deepfakes.
-- **Active liveness** asks the person to complete a challenge such as blinking twice, turning their head, or smiling.
-
-For the MVP, active liveness starts with **blink twice** using MediaPipe face landmarks. Passive liveness uses the MiniFASNet-based antispoofing path already in the ML layer.
-
-Attendance should only be recorded after:
+The MVP flow is intentionally small:
 
 ```text
-active challenge completed
-+ passive spoof check passed
-+ face matched to a registered identity
-= valid attendance check-in
+register a consenting face
+create an attendance session
+check in with blink-twice liveness
+match the live face to the registered template
+record attendance
+export attendance as CSV
 ```
+
+No admin panel, no organizer mode, no background surveillance, no crawler, no
+public-web search, no takedown flow.
 
 ---
 
-## Core Flows
+## Current MVP
 
-### Registration
+FaceAttend is built around explicit self check-ins.
 
-1. Admin or user opens the registration page.
-2. User provides identity details such as name, email, class/group, or employee/student ID.
-3. User completes liveness capture.
-4. System detects and embeds the face.
-5. System stores the embedding and registration metadata.
-6. Audit log records consent and biometric enrollment.
+1. A user creates an account or logs in.
+2. The user registers their face with a short webcam video.
+3. The backend verifies active liveness with a blink-twice challenge.
+4. The backend samples frames from that same video and checks passive liveness.
+5. The best live frame is embedded and stored in the vector index.
+6. The user creates an attendance session.
+7. The user checks in to that session with another blink-twice webcam video.
+8. The backend verifies liveness again, embeds the best live frames, and matches
+   against the registered face template.
+9. Attendance is recorded only when liveness and identity match both pass.
 
-### Attendance Check-In
+Attendance is never recorded from a static uploaded image alone.
 
-1. User opens a session check-in page.
-2. System issues an active liveness challenge.
-3. User records a short webcam clip and submits it.
-4. ML service verifies active liveness and passive liveness.
-5. Backend embeds the live face and searches the registered-face index.
-6. If confidence is high enough, attendance is recorded.
-7. UI shows success, duplicate check-in, failed liveness, or no registered match.
+---
 
-### Admin / Instructor Review
+## Screenshots / Demo Flow
 
-Admins or instructors can:
+Add real screenshots after running the local demo:
 
-- create attendance sessions
-- view check-ins by session
-- export attendance records
-- review failed or suspicious check-in attempts
-- delete a person’s biometric data when required
+| Step | Page | What to capture |
+|---|---|---|
+| 1 | `/face-registration` | Webcam oval, countdown, blink challenge |
+| 2 | `/sessions` | Created attendance session |
+| 3 | `/check-in` | Session selector and liveness camera |
+| 4 | `/attendance` | Recorded check-in and confidence |
+| 5 | `/attendance.csv` | CSV export downloaded/opened |
+
+Recommended files:
+
+```text
+docs/screenshots/01-face-registration.png
+docs/screenshots/02-sessions.png
+docs/screenshots/03-check-in.png
+docs/screenshots/04-attendance.png
+docs/screenshots/05-csv-export.png
+```
+
+Short demo video outline:
+
+```text
+0:00 Login
+0:05 Register face with blink twice
+0:20 Create attendance session
+0:30 Check in with blink twice
+0:45 Show attendance result
+0:55 Show duplicate check-in behavior
+1:05 Export CSV
+```
+
+Do not record or publish another person’s face without explicit consent.
+
+---
+
+## Liveness Policy
+
+The current production-ish rule is:
+
+```text
+active_liveness_passed
+AND passive_liveness_pass_ratio >= 0.8
+AND face_visible_ratio >= 0.8
+AND identity_similarity >= 0.75
+```
+
+Active liveness:
+
+- implemented with MediaPipe Face Landmarker
+- current challenge: `blink_twice`
+- frontend gives live guidance only
+- backend is the source of truth
+
+Passive liveness:
+
+- samples frames from the webcam video
+- runs MiniFASNet-based passive spoof detection
+- uses the best live frames for embedding and matching
+
+Identity matching:
+
+- registration stores embeddings, not raw face crops
+- check-in searches the user’s registered face template
+- low-confidence or wrong-person matches do not record attendance
+- duplicate check-ins for the same session are idempotent
 
 ---
 
@@ -79,32 +113,34 @@ Admins or instructors can:
 
 ```text
 ┌────────────────────┐
-│      Web App       │
+│   Frontend Site    │
 │ FastAPI + Jinja2   │
-│       + HTMX       │
+│ HTMX + webcam JS   │
 └─────────┬──────────┘
           │ HTTP
           ▼
 ┌────────────────────┐
 │    Backend API     │
 │ FastAPI + SQLModel │
-│ Auth, Sessions,    │
-│ Attendance, Audit  │
+│ Auth, sessions,    │
+│ check-ins, audit   │
 └─────────┬──────────┘
           │
           ├──────────────┐
           ▼              ▼
 ┌─────────────────┐  ┌──────────────────┐
 │   ML Service    │  │   Vector Store    │
-│ Face detect,    │  │ FAISS initially,  │
-│ embed, liveness │  │ Qdrant/Milvus later│
+│ face embedding, │  │ FAISS locally     │
+│ active/passive  │  │                  │
+│ liveness        │  │                  │
 └─────────────────┘  └──────────────────┘
           │
           ▼
 ┌────────────────────┐
-│ PostgreSQL + Audit │
-│ people, sessions,  │
-│ check-ins, logs    │
+│ PostgreSQL          │
+│ users, sessions,    │
+│ registrations,      │
+│ attendance records  │
 └────────────────────┘
 ```
 
@@ -114,155 +150,167 @@ Admins or instructors can:
 
 | Layer | Tooling |
 |---|---|
-| Web UI | **FastAPI + Jinja2 + HTMX** — pure Python, no build step |
-| Styling | **Tailwind CSS** via CDN, **DaisyUI** for pre-built components |
-| Webcam capture | ~50 lines of vanilla **JavaScript** (only place JS is needed) |
-| Forms | **WTForms** + Pydantic validation |
-| Auth | **fastapi-users** (drop-in auth) |
-| Backend API | **FastAPI** (Python 3.11+) |
-| ORM | **SQLModel** (Pydantic + SQLAlchemy, same author as FastAPI) |
-| RDBMS | **PostgreSQL** |
-| Cache & rate limit | **Redis** |
-| Face Detection | RetinaFace / SCRFD (ONNX) — via **insightface** library |
-| Face Alignment | 5-point landmark alignment (included with insightface) |
-| Embeddings | ArcFace / AdaFace — also via **insightface** |
-| Passive liveness / Antispoofing | MiniFASNet / Silent-Face-Anti-Spoofing |
-| Active liveness | MediaPipe face landmarks, starting with blink detection |
-| Vector DB | **FAISS** to start → **Qdrant / Milvus** for scale |
-| GPU Serving | Triton Inference Server or Ray Serve (later) |
-| Queue | Celery + Redis for simplicity → Kafka when scaling |
-| Storage | MinIO locally → S3 in production |
-| Notifications | Email (Postmark) + webhooks |
-| Monitoring | Prometheus + Grafana, OpenTelemetry |
-| Orchestration | Docker Compose → Kubernetes |
-
----
-
-## Core Features
-
-### For users
-- 🪪 **Face registration** with explicit consent
-- ✅ **Liveness-gated check-in** for attendance sessions
-- 📊 **Attendance result feedback**: success, duplicate, failed liveness, or no match
-- 🗑 **Privacy controls** for export/deletion where applicable
-
-### For admins / instructors
-- 🧑‍🏫 **Attendance session management**
-- 📋 **Attendance dashboard** by class, event, or shift
-- 📤 **CSV/export support** for attendance records
-- 🔎 **Review queue** for failed or suspicious check-ins
-
-### Cross-cutting
-- 🔐 **Authentication** for registration, check-in, and admin review
-- 🛡 **Rate limiting** per IP, per account, per API key
-- 🗝 **Encryption at rest** for biometric embeddings
-- 📦 **Model versioning + re-embedding pipeline**
+| Frontend | FastAPI, Jinja2, HTMX |
+| Styling | Tailwind CSS CDN, DaisyUI |
+| Webcam | Vanilla JavaScript in `frontend/public-site/static/js/webcam.js` |
+| Backend API | FastAPI |
+| ORM | SQLModel |
+| Database | PostgreSQL |
+| ML API | FastAPI |
+| Active liveness | MediaPipe Face Landmarker |
+| Passive liveness | MiniFASNet-style antispoofing |
+| Embeddings | ArcFace/AdaFace pipeline |
+| Vector search | FAISS locally |
 
 ---
 
 ## Project Structure
 
-```
+```text
 faceattend/
-├── backend/              # Backend API, attendance, registration, audit
-│   ├── api/              # FastAPI app and routes
-│   ├── db/               # SQLModel models and migrations
-│   ├── indexer/          # Vector index management
-│   ├── audit/            # Audit logging
-│   └── CLAUDE.md
-├── ml/                   # Inference pipeline
-│   ├── liveness/         # Passive and active liveness
-│   ├── pipeline/         # Face embedding and inference helpers
-│   ├── serving/          # ML HTTP service
-│   └── CLAUDE.md
-├── frontend/             # FastAPI public site with Jinja2 + HTMX
-│   ├── public-site/      # End-user-facing app
-│   └── CLAUDE.md
-├── infra/                # Docker, K8s, Terraform
-├── scripts/              # Dev utilities and demo seed scripts
-├── tests/
-├── docs/
-│   ├── adr/              # Architecture Decision Records
-│   ├── legal/            # GDPR, EU AI Act notes
-│   └── api/              # OpenAPI specs
-├── CLAUDE.md             # Root instructions
-├── pyproject.toml
+├── backend/        # FastAPI API, auth, sessions, registrations, check-ins
+├── ml/             # Face embeddings, active liveness, passive liveness
+├── frontend/       # Server-rendered public site
+│   └── public-site/
+├── docs/           # ADRs, legal notes, screenshots, learnings
+├── scripts/        # Dev utilities
+├── tests/          # Cross-component tests
+├── alembic.ini
 ├── docker-compose.yml
+├── pyproject.toml
 └── .env.example
 ```
 
-Some older modules may still reflect the previous web-monitoring direction while the project is being migrated. New work should follow the attendance-system model described here.
+---
+
+## Local Demo
+
+### 1. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Set real local values for:
+
+```bash
+POSTGRES_URI=postgresql+asyncpg://user:pass@localhost:5432/faceattend
+ALEMBIC_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/faceattend
+JWT_SECRET=changeme-use-32-plus-random-bytes-in-production
+ML_SERVICE_URL=http://localhost:8003
+BACKEND_API_URL=http://localhost:8002
+```
+
+### 2. Start dependencies
+
+Use Docker Compose for Postgres/Redis/etc. if needed:
+
+```bash
+docker compose up
+```
+
+If you already run Postgres locally, make sure the `faceattend` database exists.
+
+### 3. Run migrations
+
+```bash
+uv run alembic -c alembic.ini upgrade head
+```
+
+### 4. Start services
+
+Use three terminals:
+
+```bash
+uv run uvicorn ml.serving.api:app --reload --port 8003
+```
+
+```bash
+uv run uvicorn backend.api.main:app --reload --port 8002
+```
+
+```bash
+uv run uvicorn frontend.public-site.main:app --reload --port 8000
+```
+
+Open:
+
+```text
+http://localhost:8000
+```
+
+### 5. Browser flow
+
+```text
+/register or /login
+/face-registration -> register face with blink twice
+/sessions -> create an attendance session
+/check-in -> select session and blink twice
+/attendance -> confirm record appears
+/attendance.csv -> confirm export works
+```
+
+### 6. Failure cases to demo
+
+- wrong face: check-in is rejected with identity mismatch
+- same face, same session twice: duplicate/idempotent behavior
+- no face: frontend asks user to position face in the oval
+- face too far: frontend asks user to move closer
+- failed blink: backend rejects liveness
 
 ---
 
-## Getting Started
+## Useful Commands
 
-### Prerequisites (anticipated)
-- Python 3.11+
-- Docker & Docker Compose
-- CUDA-capable GPU eventually (CPU is fine for Phases 0-5)
-- `uv` for Python deps
-
-### Quick start (target)
 ```bash
-git clone https://github.com/your-org/faceattend.git
-cd faceattend
-cp .env.example .env
-docker compose up
-# Public site:   http://localhost:8000
-# Backend API:   http://localhost:8002
+uv run pytest
+uv run ruff check .
+uv run ruff format .
+uv run alembic -c alembic.ini upgrade head
+uv run uvicorn ml.serving.api:app --reload --port 8003
+uv run uvicorn backend.api.main:app --reload --port 8002
+uv run uvicorn frontend.public-site.main:app --reload --port 8000
 ```
 
 ---
 
-## Legal, Privacy, And Safety
+## Privacy And Safety
 
-Biometric data is **Article 9 special category data** under GDPR — stricter protections required.
+FaceAttend handles biometric data. Treat it as sensitive.
 
-- ✅ **Lawful basis**: explicit consent at face registration
-- ✅ **Data minimization**: store embeddings, not raw face images, beyond processing window
-- ✅ **Right to erasure**: registration + embedding deletion when required
-- ✅ **Right to portability**: data export available
-- ✅ **Purpose limitation**: use registered faces only for explicit attendance check-ins
-- ✅ **Audit trail**: every registration, liveness attempt, match decision, check-in, export, and deletion logged with actor, target, timestamp, and justification
-- ✅ **EU AI Act**: face recognition may fall under high-risk; conformity assessment required pre-launch
-- ✅ **No hidden surveillance**: check-ins must be explicit user actions
-
-**A legal review is required before production deployment.**
+- Use only consenting test users.
+- Do not demo with crawled or public celebrity images.
+- Do not store raw face crops in the vector database.
+- Do not record attendance without active and passive liveness.
+- Do not add background tracking or hidden surveillance.
+- Keep audit logging for biometric operations.
+- Get legal review before any real production deployment.
 
 ---
 
-## Documentation
+## Current Status
 
-- [`CLAUDE.md`](./CLAUDE.md) — Instructions for Claude Code (root)
-- [`backend/CLAUDE.md`](./backend/CLAUDE.md) — API, attendance, registration, audit
-- [`ml/CLAUDE.md`](./ml/CLAUDE.md) — Inference, liveness, clustering
-- [`frontend/CLAUDE.md`](./frontend/CLAUDE.md) — Public site (Jinja2 + HTMX)
-- [`docs/adr/`](./docs/adr) — Architecture Decision Records
+Implemented:
 
----
+- account login/register
+- webcam face registration
+- frontend liveness guidance and countdown
+- backend active blink liveness
+- passive liveness on sampled video frames
+- embedding storage in FAISS
+- attendance sessions
+- liveness-gated check-in
+- duplicate check-in handling
+- attendance dashboard
+- CSV export
 
-## Current MVP Priorities
+Not in scope for this MVP:
 
-1. Active liveness with MediaPipe blink detection.
-2. Passive liveness integration with registration/check-in.
-3. Face registration with embedding storage.
-4. Attendance session and check-in models.
-5. Match live check-in face against registered embeddings.
-6. Attendance dashboard and export.
-
----
-
-## Demo Strategy
-
-Use consented local data:
-
-- register yourself or a consenting test user
-- record active liveness through the webcam
-- seed a small local set of registration/check-in examples
-- show successful, duplicate, spoof-failed, and no-match check-ins
-
-Do not demo with people who did not consent.
+- admin panel
+- organizer/instructor mode
+- reports page
+- settings page
+- crawler/search/takedown flows
 
 ---
 

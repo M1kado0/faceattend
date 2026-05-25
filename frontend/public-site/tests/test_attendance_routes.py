@@ -409,18 +409,16 @@ def test_create_session_redirects_to_sessions(client, monkeypatch) -> None:
     assert fake_client.created_session_name == "CS101 Monday"
 
 
-def test_reports_page_shows_attendance_reports(client) -> None:
+def test_reports_page_is_removed(client) -> None:
     response = client.get("/reports")
 
-    assert response.status_code == 200
-    assert "Attendance reports" in response.text
+    assert response.status_code == 404
 
 
-def test_settings_page_shows_attendance_privacy_settings(client) -> None:
+def test_settings_page_is_removed(client) -> None:
     response = client.get("/settings")
 
-    assert response.status_code == 200
-    assert "attendance privacy" in response.text
+    assert response.status_code == 404
 
 
 def test_successful_attendance_list_returns_results_page(client, monkeypatch) -> None:

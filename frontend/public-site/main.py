@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from routers import attendance, auth, billing, face_registrations, settings  # noqa: E402
+from routers import attendance, auth, billing, face_registrations  # noqa: E402
 
 app = FastAPI(title="FaceAttend — Public Site", version="0.1.0")
 
@@ -32,16 +32,7 @@ async def index(request: Request):
     )
 
 
-@app.get("/reports", response_class=HTMLResponse)
-async def reports_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="pages/reports.html",
-    )
-
-
 app.include_router(auth.router, tags=["auth"])
 app.include_router(face_registrations.router, tags=["face-registrations"])
 app.include_router(attendance.router, tags=["attendance"])
-app.include_router(settings.router, tags=["settings"])
 app.include_router(billing.router, tags=["billing"])
