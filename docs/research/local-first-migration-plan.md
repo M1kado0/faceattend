@@ -55,18 +55,21 @@ implementation turn with the date, files changed, checks run, and the next gate.
 
 **Status: IN_PROGRESS**
 
-- [ ] Validate head pose using MediaPipe transformation matrices.
-- [ ] Implement and compare calibrated canonical-3D `solvePnP` pose estimation.
-- [ ] Test pose signs, units, neutral/turn directions, smoothing, and
-      hysteresis.
-- [ ] Add temporal face continuity and fail-closed substitution checks.
+- [ ] Validate MediaPipe transformation-matrix extraction against actual
+      Face Landmarker output. The current legacy options disable matrix output.
+- [x] Implement canonical-3D `solvePnP` pose estimation with documented
+      camera-intrinsic fallback.
+- [x] Test pose signs, degree units, neutral/turn directions, smoothing, and
+      hysteresis with deterministic synthetic fixtures.
+- [x] Add temporal face continuity and fail-closed substitution checks.
 - [ ] Extract model lifecycle behind headless detector, aligner, embedder, and
       passive-PAD adapters.
-- [ ] Remove misleading embedding model metadata and preserve model checksums.
+- [ ] Remove misleading embedding model metadata and preserve model checksums
+      during adapter extraction.
 - [ ] Keep current MiniFASNetV2 as a replaceable baseline pending evaluation.
 
-**Next gate:** Head-pose tests pass on synthetic/controlled landmark fixtures;
-then extract existing CV behavior without importing FastAPI or Qt.
+**Next gate:** Compare the new estimator with actual MediaPipe transformation
+matrices, then extract existing CV behavior without importing FastAPI or Qt.
 
 ### Phase 3 — Add local SQLite persistence
 
@@ -177,6 +180,110 @@ then extract existing CV behavior without importing FastAPI or Qt.
 - Graphify code graph synchronized; completion evidence saved to Graphify
   memory.
 - No GUI, SQLite migration, model extraction, or destructive cleanup performed.
+
+**2026-09-04 — Phase 2 pose and continuity foundation (IN_PROGRESS)**
+
+- Added headless canonical `solvePnP` and transformation-matrix pose helpers;
+  both return documented degree-valued yaw, pitch, and roll.
+- Added deterministic projections recovering neutral, yaw, pitch, and roll
+  within 0.2 degrees, matrix extraction tests, invalid-input tests,
+  exponential smoothing, and enter/exit hysteresis tests.
+- Added `FaceContinuityTracker` with bounded no-face gaps, monotonic timestamps,
+  track-ID checks, multiple-face rejection, center-jump limits, and area-change
+  limits.
+- Added `LazyModel` and model metadata contracts; concrete InsightFace and
+  MiniFASNet adapters remain pending.
+- Verification: 80 tests passed; Ruff passed; `mypy src` passed; full `mypy .`
+  retained the same five baseline errors; focused headless coverage is 92%.
+- Evidence boundary: synthetic pose tests validate implementation mathematics,
+  not camera accuracy. Actual MediaPipe matrix output and target-camera error
+  are still unmeasured. Phase 2 remains `IN_PROGRESS`.
+
+**2026-09-04 — Controlled pose-validation helper (IN_PROGRESS)**
+
+- Added a headless validation summary that compares estimated yaw/pitch/roll
+  against controlled reference poses and reports per-axis mean/max error and
+  pass rate at a chosen tolerance.
+- Added tests for passing samples, empty datasets, invalid tolerances, and
+  non-finite estimates.
+- Evidence boundary: this helper evaluates recorded/reference pose estimates;
+  it does not collect webcam data or establish real-camera accuracy.
+- Phase 2 remains `IN_PROGRESS`; a real-camera fixture and MediaPipe matrix
+  comparison are still required.
+
+**2026-09-04 — Model lifecycle and detector adapter example (IN_PROGRESS)**
+
+- Added a thread-safe lazy model loader and an injectable `InsightFaceDetector`
+  adapter under the headless vision package.
+- The adapter converts raw InsightFace faces into typed `FaceObservation`
+  values and exposes model metadata without importing Qt, FastAPI, or storage.
+- Added fake-model tests proving one-time loading and field conversion without
+  downloading model weights.
+- The adapter's provisional quality values are detection placeholders; a
+  dedicated quality policy remains to be extracted and validated.
+- Verification: focused detector/pose tests passed, Ruff passed, and `mypy src`
+  passed. Phase 2 remains `IN_PROGRESS`.
+
+**2026-09-04 — Direct InsightFace recognition adapter (IN_PROGRESS)**
+
+- Replaced the partial embedding function with `InsightFaceEmbedder`, which
+  accepts an aligned HWC `uint8` BGR image and calls InsightFace's recognition
+  model directly through `get_feat`.
+- Added one-time lazy loading, L2 normalization, finite/zero-output checks,
+  injectable model loading, and explicit model metadata.
+- Verification: embedding, detector, and pose tests passed (23 total); Ruff
+  and `mypy src` passed. Real `buffalo_l` inference and checksum discovery are
+  still pending; Phase 2 remains `IN_PROGRESS`.
+
+**2026-09-04 — Five-point alignment adapter (IN_PROGRESS)**
+
+- Replaced the incomplete alignment draft with `InsightFaceAligner` using
+  InsightFace's ArcFace `norm_crop` convention.
+- The adapter validates an HWC `uint8` BGR frame and exactly five finite 2D
+  landmarks, then returns a contiguous 112x112 crop for the embedder.
+- Added alignment shape, dtype, invalid-landmark, and invalid-frame tests.
+- Verification: alignment, embedding, and detector tests passed (13 total);
+  Ruff and `mypy src` passed. Phase 2 remains `IN_PROGRESS`.
+
+**2026-09-04 — Headless recognition smoke-test script (IN_PROGRESS)**
+
+- Added `scripts/test_headless_pipeline.py` to exercise a local image through
+  detector → five-point alignment → direct recognition embedding.
+- The script prints face count, detector score, landmark shape, aligned image
+  shape, embedding dimension/dtype/norm, and model metadata; it writes no image
+  or embedding data.
+- Verification: Ruff passed. Real execution requires a local `buffalo_l`
+  detector pack, one test image, and the recognition ONNX path.
+
+**2026-09-05 — Direct detector model ownership (IN_PROGRESS)**
+
+- Changed `InsightFaceDetector` to load only `models/det_10g.onnx` through the
+  InsightFace model-zoo adapter instead of constructing `FaceAnalysis`, which
+  loaded unrelated landmark, gender/age, and recognition models.
+- Updated the smoke test to accept `--detector-model`; the embedder remains the
+  sole owner of `models/w600k_r50.onnx`.
+- Verification: detector, alignment, and embedding tests passed (13 total);
+  Ruff and `mypy src` passed; the real local image smoke test completed with
+  one face, five keypoints, a 112x112 crop, and a normalized 512-D embedding.
+- Limitation: detector quality fields remain provisional and model checksums
+  are still supplied as configuration rather than discovered automatically.
+
+**2026-09-05 — Visual pipeline diagnostics (IN_PROGRESS)**
+
+- Extended `scripts/test_headless_pipeline.py` with optional OpenCV previews and
+  diagnostic image output for the original frame, detected landmarks, and
+  aligned crop.
+- The embedding stage remains numeric; the script prints its dimension, dtype,
+  norm, and model metadata instead of fabricating an image visualization.
+- Default execution remains non-visual and writes no files.
+
+**2026-09-05 — Temporary diagnostic image output (IN_PROGRESS)**
+
+- The smoke-test script now saves original, detected, and aligned images to a
+  generated temporary directory by default and prints only that directory
+  path, not image data.
+- `--save-dir` remains available when a persistent diagnostic location is
+  explicitly desired; `--show` remains optional for interactive OpenCV windows.
 
 ## Update template
 

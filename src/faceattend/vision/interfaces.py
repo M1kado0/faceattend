@@ -13,12 +13,16 @@ from faceattend.vision.types import (
     HeadPose,
     LivenessEvidence,
     MatchDecision,
+    ModelMetadata,
     PoseEvidence,
     UInt8Array,
 )
 
 
 class FaceDetector(Protocol):
+    @property
+    def model_metadata(self) -> ModelMetadata: ...
+
     def detect(self, frame: Frame) -> Sequence[FaceObservation]: ...
 
 
@@ -32,6 +36,9 @@ class FaceEmbedder(Protocol):
 
     @property
     def model_version(self) -> str: ...
+
+    @property
+    def model_checksum(self) -> str: ...
 
     def embed(self, aligned_face: UInt8Array) -> Float32Array: ...
 
@@ -53,6 +60,9 @@ class ActiveLivenessEvaluator(Protocol):
 
 
 class PassiveLivenessDetector(Protocol):
+    @property
+    def model_metadata(self) -> ModelMetadata: ...
+
     def evaluate(
         self,
         frames: Sequence[Frame],

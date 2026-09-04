@@ -15,6 +15,15 @@ UInt8Array: TypeAlias = NDArray[np.uint8]
 
 
 @dataclass(frozen=True, slots=True)
+class ModelMetadata:
+    """Identity of loaded weights; embeddings from different versions are incomparable."""
+
+    name: str
+    version: str
+    checksum: str
+
+
+@dataclass(frozen=True, slots=True)
 class Frame:
     """Transient camera frame; ordinary workflows must not persist its pixels."""
 
