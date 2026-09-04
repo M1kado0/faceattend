@@ -66,7 +66,7 @@ async def liveness_passive(blob: UploadFile) -> dict:
 @app.post("/v1/liveness/active")
 async def liveness_active(
     blob: UploadFile,
-    challenge: str = Form(default="blink_twice"),
+    challenge: str = Form(default="blink_turn_left_right"),
 ) -> dict:
     raw = await blob.read()
     try:

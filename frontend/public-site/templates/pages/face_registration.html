@@ -50,14 +50,14 @@
 
     <div class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
         <div class="mb-5">
-            <h2 class="text-lg font-semibold">Blink challenge registration</h2>
+            <h2 class="text-lg font-semibold">Liveness challenge registration</h2>
             <p class="mt-2 text-sm text-base-content/70">
-                Blink twice in a short webcam video. FaceAttend checks active liveness,
+                Blink twice, turn left, then turn right in a short webcam video. FaceAttend checks active liveness,
                 checks passive liveness on sampled frames, then stores one verified face template.
             </p>
         </div>
 
-        {% with liveness_start_url="/face-registrations", result_id="face-registration-result", button_text="Blink twice and register", can_start=can_register %}
+        {% with liveness_start_url="/face-registrations", result_id="face-registration-result", button_text="Start liveness registration", can_start=can_register %}
             {% include "partials/liveness_camera.html" %}
         {% endwith %}
     </div>

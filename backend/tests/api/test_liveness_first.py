@@ -149,7 +149,12 @@ async def test_face_registration_rejects_failed_liveness_before_embedding(
 
     async def fake_liveness(**kwargs) -> LivenessCheck:
         calls.append(("liveness", kwargs["filename"]))
-        return LivenessCheck(passed=False, score=0.2, label="blink_twice", reason="spoof")
+        return LivenessCheck(
+            passed=False,
+            score=0.2,
+            label="blink_turn_left_right",
+            reason="spoof",
+        )
 
     async def fake_video_liveness(**kwargs) -> VideoLivenessSummary:
         raise AssertionError("passive frame liveness must not run after failed active liveness")
@@ -192,7 +197,7 @@ async def test_enroll_indexes_only_after_passed_liveness(monkeypatch, user) -> N
 
     async def fake_liveness(**kwargs) -> LivenessCheck:
         calls.append(("liveness", kwargs["filename"]))
-        return LivenessCheck(passed=True, score=0.99, label="blink_twice")
+        return LivenessCheck(passed=True, score=0.99, label="blink_turn_left_right")
 
     async def fake_video_liveness(**kwargs) -> VideoLivenessSummary:
         calls.append(("video_passive", kwargs["max_frames"]))
@@ -375,7 +380,7 @@ async def test_check_in_filters_by_embedding_model_after_liveness(monkeypatch, u
         return None
 
     async def fake_liveness(**kwargs) -> LivenessCheck:
-        assert kwargs["challenge"] == "blink_twice"
+        assert kwargs["challenge"] == "blink_turn_left_right"
         return LivenessCheck(passed=True, score=0.99, label="Real")
 
     async def fake_embed(**kwargs) -> EmbeddingResult:
@@ -438,7 +443,7 @@ async def test_check_in_reuses_existing_persisted_match(monkeypatch, user) -> No
         return None
 
     async def fake_liveness(**kwargs) -> LivenessCheck:
-        assert kwargs["challenge"] == "blink_twice"
+        assert kwargs["challenge"] == "blink_turn_left_right"
         return LivenessCheck(passed=True, score=0.99, label="Real")
 
     async def fake_embed(**kwargs) -> EmbeddingResult:
@@ -486,8 +491,8 @@ async def test_check_in_rejects_failed_video_passive_liveness(monkeypatch, user)
         return None
 
     async def fake_liveness(**kwargs) -> LivenessCheck:
-        assert kwargs["challenge"] == "blink_twice"
-        return LivenessCheck(passed=True, score=0.99, label="blink_twice")
+        assert kwargs["challenge"] == "blink_turn_left_right"
+        return LivenessCheck(passed=True, score=0.99, label="blink_turn_left_right")
 
     async def fake_video_liveness(**kwargs) -> VideoLivenessSummary:
         summary = _passing_video_summary()
@@ -531,8 +536,8 @@ async def test_check_in_rejects_low_face_visible_ratio(monkeypatch, user) -> Non
         return None
 
     async def fake_liveness(**kwargs) -> LivenessCheck:
-        assert kwargs["challenge"] == "blink_twice"
-        return LivenessCheck(passed=True, score=0.99, label="blink_twice")
+        assert kwargs["challenge"] == "blink_turn_left_right"
+        return LivenessCheck(passed=True, score=0.99, label="blink_turn_left_right")
 
     async def fake_video_liveness(**kwargs) -> VideoLivenessSummary:
         summary = _passing_video_summary()
@@ -576,8 +581,8 @@ async def test_check_in_rejects_identity_mismatch(monkeypatch, user) -> None:
         return None
 
     async def fake_liveness(**kwargs) -> LivenessCheck:
-        assert kwargs["challenge"] == "blink_twice"
-        return LivenessCheck(passed=True, score=0.99, label="blink_twice")
+        assert kwargs["challenge"] == "blink_turn_left_right"
+        return LivenessCheck(passed=True, score=0.99, label="blink_turn_left_right")
 
     async def fake_video_liveness(**kwargs) -> VideoLivenessSummary:
         return _passing_video_summary()

@@ -78,7 +78,11 @@ instance/
 *.engine
 *.trt
 *.plan
-models/
+# Only the root artifact directory is ignored. A recursive `models/` pattern
+# also hid Python source in backend/db/models/.
+/models/
+/ml/models/*
+!/ml/models/.gitkeep
 weights/
 checkpoints/
 
@@ -160,12 +164,15 @@ tmp/
 scratch/
 
 
-graphify-out
-docs
+# Keep Graphify's reproducible map and durable decision memory in Git, while
+# leaving generated visualizations and caches local.
+/graphify-out/*
+!/graphify-out/GRAPH_REPORT.md
+!/graphify-out/graph.json
+!/graphify-out/memory/
+!/graphify-out/memory/*.md
 .codex
-AGENTS.md
 images
-.github
 .mcp.json
 
 .agents

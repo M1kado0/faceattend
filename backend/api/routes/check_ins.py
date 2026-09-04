@@ -70,7 +70,7 @@ async def check_in(
         liveness = await verify_active_liveness(
             ml_service_url=ML_SERVICE_URL,
             blob=liveness_bytes,
-            challenge="blink_twice",
+            challenge="blink_turn_left_right",
             filename=liveness_blob.filename or "liveness.webm",
             content_type=liveness_blob.content_type or "application/octet-stream",
         )

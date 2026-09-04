@@ -21,6 +21,7 @@ if __name__ == "__main__" and __package__ is None:
 
 from ml.liveness.base import LivenessResult
 from ml.liveness.challenge import ActiveLivenessChallenge
+from ml.liveness.head_pose import estimate_head_pose
 
 RIGHT_EYE = (33, 159, 158, 133, 153, 145)
 LEFT_EYE = (362, 380, 374, 263, 386, 385)
@@ -32,7 +33,7 @@ class ActiveLivenessConfig:
 
     min_blinks: int = 2
     min_seconds: float = 1.0
-    max_seconds: float = 6.0
+    max_seconds: float = 15.0
     min_face_frame_ratio: float = 0.65
     closed_eye_threshold: float = 0.08
     open_eye_threshold: float = 0.14
@@ -41,6 +42,8 @@ class ActiveLivenessConfig:
     min_open_frames: int = 2
     blink_cooldown_ms: int = 250
     max_multiple_face_frame_ratio: float = 0.05
+    head_turn_yaw_threshold: float = 10.0
+    min_head_turn_frames: int = 3
 
 
 @dataclass(frozen=True)
@@ -191,6 +194,72 @@ class BlinkCounter:
         self.open_frame_count = 0
 
 
+class BlinkTurnLeftRightChallenge:
+    def __init__(self, config: ActiveLivenessConfig) -> None:
+        self.config = config
+        self.blink_counter = BlinkCounter(
+            config.closed_eye_threshold,
+            config.open_eye_threshold,
+            config.min_closed_frames,
+            config.min_open_frames,
+            config.blink_cooldown_ms,
+        )
+        self.stage = "BLINK"
+        self.left_frame_count = 0
+        self.right_frame_count = 0
+
+    def observe(
+        self,
+        *,
+        eye_aspect_ratio: float,
+        yaw: float | None,
+        timestamp_ms: int,
+    ) -> None:
+        if self.stage == "BLINK":
+            self.blink_counter.observe(eye_aspect_ratio, timestamp_ms)
+            if self.blink_counter.blinks >= self.config.min_blinks:
+                self.stage = "TURN_LEFT"
+            return
+
+        if self.stage == "TURN_LEFT":
+            if yaw is not None and yaw <= -self.config.head_turn_yaw_threshold:
+                self.left_frame_count += 1
+                if self.left_frame_count >= self.config.min_head_turn_frames:
+                    self.stage = "TURN_RIGHT"
+                return
+            self.left_frame_count = 0
+            return
+
+        if self.stage == "TURN_RIGHT":
+            if yaw is not None and yaw >= self.config.head_turn_yaw_threshold:
+                self.right_frame_count += 1
+                if self.right_frame_count >= self.config.min_head_turn_frames:
+                    self.stage = "DONE"
+                return
+            self.right_frame_count = 0
+
+    @property
+    def completed(self) -> bool:
+        return self.stage == "DONE"
+
+    @property
+    def reason(self) -> str:
+        if self.stage == "BLINK":
+            return "blink_not_completed"
+        if self.stage == "TURN_LEFT":
+            return "left_turn_not_completed"
+        if self.stage == "TURN_RIGHT":
+            return "right_turn_not_completed"
+        return "challenge_not_completed"
+
+    @property
+    def score(self) -> float:
+        blink_score = min(self.blink_counter.blinks / self.config.min_blinks, 1.0)
+        left_score = min(self.left_frame_count / self.config.min_head_turn_frames, 1.0)
+        right_score = min(self.right_frame_count / self.config.min_head_turn_frames, 1.0)
+        return (blink_score + left_score + right_score) / 3
+
+
 def _average_eye_aspect_ratio(face_landmarks: list) -> float:
     left = _eye_aspect_ratio(face_landmarks, LEFT_EYE)
     right = _eye_aspect_ratio(face_landmarks, RIGHT_EYE)
@@ -262,6 +331,8 @@ class MediaPipeActiveLivenessChecker:
                     reason=None if passed else blink_result.reason,
                     challenge_completed=blink_result.challenge_completed,
                 )
+            if challenge == ActiveLivenessChallenge.BLINK_TURN_LEFT_RIGHT:
+                return self._check_blink_turn_left_right(frames)
         except FileNotFoundError as exc:
             return _failed(
                 "model_not_found",
@@ -330,6 +401,18 @@ class MediaPipeActiveLivenessChecker:
             timestamp_offset_ms = self._timestamp_offset_for_next_video(frames)
             return self._check_blink_twice_with_offset(frames, timestamp_offset_ms)
 
+    def _check_blink_turn_left_right(self, frames: list[VideoFrame]) -> LivenessResult:
+        if not frames:
+            return _failed(
+                "no_video_frames",
+                score=0.0,
+                challenge_completed=False,
+            )
+
+        with self._landmarker_lock:
+            timestamp_offset_ms = self._timestamp_offset_for_next_video(frames)
+            return self._check_blink_turn_left_right_with_offset(frames, timestamp_offset_ms)
+
     def _timestamp_offset_for_next_video(self, frames: list[VideoFrame]) -> int:
         timestamp_offset_ms = self._next_video_timestamp_offset_ms
         self._next_video_timestamp_offset_ms += frames[-1].timestamp_ms + 1
@@ -393,4 +476,83 @@ class MediaPipeActiveLivenessChecker:
             label=ActiveLivenessChallenge.BLINK_TWICE.value,
             reason=None if challenge_completed else "challenge_not_completed",
             challenge_completed=challenge_completed,
+        )
+
+    def _check_blink_turn_left_right_with_offset(
+        self,
+        frames: list[VideoFrame],
+        timestamp_offset_ms: int,
+    ) -> LivenessResult:
+        challenge = BlinkTurnLeftRightChallenge(self.config)
+        face_frames = 0
+        multiple_face_frames = 0
+
+        for frame in frames:
+            timestamp_ms = frame.timestamp_ms + timestamp_offset_ms
+            result = self._landmarker_instance().detect_for_video(
+                mp.Image(image_format=mp.ImageFormat.SRGB, data=frame.image_rgb),
+                timestamp_ms,
+            )
+            face_count = len(result.face_landmarks)
+            if face_count == 0:
+                continue
+            if face_count > 1:
+                multiple_face_frames += 1
+                continue
+
+            face_frames += 1
+            landmarks = result.face_landmarks[0]
+            eye_aspect_ratio = _average_eye_aspect_ratio(landmarks)
+            image_height, image_width = frame.image_rgb.shape[:2]
+            head_pose = estimate_head_pose(
+                landmarks,
+                image_width=image_width,
+                image_height=image_height,
+            )
+            if head_pose is None:
+                print(
+                    "[head-pose-debug]",
+                    f"timestamp_ms={timestamp_ms}",
+                    f"stage={challenge.stage}",
+                    f"ear={eye_aspect_ratio:.3f}",
+                    "pose=None",
+                )
+            else:
+                print(
+                    "[head-pose-debug]",
+                    f"timestamp_ms={timestamp_ms}",
+                    f"stage={challenge.stage}",
+                    f"ear={eye_aspect_ratio:.3f}",
+                    f"yaw={head_pose.yaw:.2f}",
+                    f"pitch={head_pose.pitch:.2f}",
+                    f"roll={head_pose.roll:.2f}",
+                )
+            challenge.observe(
+                eye_aspect_ratio=eye_aspect_ratio,
+                yaw=head_pose.yaw if head_pose else None,
+                timestamp_ms=timestamp_ms,
+            )
+
+        multiple_face_ratio = multiple_face_frames / len(frames)
+        if multiple_face_ratio > self.config.max_multiple_face_frame_ratio:
+            return _failed(
+                "multiple_faces_detected",
+                score=0.0,
+                challenge_completed=False,
+            )
+
+        face_frame_ratio = face_frames / len(frames)
+        if face_frame_ratio < self.config.min_face_frame_ratio:
+            return _failed(
+                "face_not_visible_enough",
+                score=0.0,
+                challenge_completed=False,
+            )
+
+        return LivenessResult(
+            passed=challenge.completed,
+            score=challenge.score,
+            label=ActiveLivenessChallenge.BLINK_TURN_LEFT_RIGHT.value,
+            reason=None if challenge.completed else challenge.reason,
+            challenge_completed=challenge.completed,
         )

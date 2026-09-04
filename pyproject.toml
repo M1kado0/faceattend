@@ -96,6 +96,7 @@ ignore = ["S101"]  # allow `assert` in tests
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["src", "."]
 testpaths = ["backend/tests", "crawler/tests", "ml/tests", "frontend", "tests"]
 markers = [
     "slow: tests requiring GPU or ONNX runtime",

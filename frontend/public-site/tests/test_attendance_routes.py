@@ -246,6 +246,8 @@ def test_face_registration_page_shows_existing_face_registrations(client, monkey
     assert "Camera is idle" in response.text
     assert 'data-liveness-phase="face"' in response.text
     assert 'data-liveness-phase="blink"' in response.text
+    assert 'data-liveness-phase="turn-left"' in response.text
+    assert 'data-liveness-phase="turn-right"' in response.text
 
 
 def test_face_registration_page_disables_form_at_face_registration_limit(
@@ -320,6 +322,8 @@ def test_check_in_page_shows_live_liveness_guidance(client, monkeypatch) -> None
     assert response.status_code == 200
     assert "Camera is idle" in response.text
     assert "liveness-face-guide" in response.text
+    assert 'data-liveness-phase="turn-left"' in response.text
+    assert 'data-liveness-phase="turn-right"' in response.text
     assert 'data-liveness-phase="upload"' in response.text
 
 
@@ -382,6 +386,25 @@ def test_check_in_identity_mismatch_returns_warning_partial(client, monkeypatch)
     assert response.status_code == 200
     assert "Face does not match this account" in response.text
     assert "Check-in was not recorded" in response.text
+
+
+def test_check_in_unhandled_backend_error_shows_detail(client, monkeypatch) -> None:
+    attendance_module = pytest.importorskip("routers.attendance")
+    monkeypatch.setattr(
+        attendance_module,
+        "backend_client",
+        FakeAttendanceClient(check_in_error=_status_error(422, "no_faces_detected")),
+    )
+    client.cookies.set("session_token", "token")
+
+    response = client.post(
+        "/check-in",
+        data={"session_id": "session-1"},
+        files=_check_in_files(),
+    )
+
+    assert response.status_code == 200
+    assert "Check-in failed: no_faces_detected" in response.text
 
 
 def test_sessions_page_shows_attendance_session(client, monkeypatch) -> None:

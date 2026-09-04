@@ -6,6 +6,7 @@ import ml.liveness.mediapipe_active as mediapipe_active
 from ml.liveness.mediapipe_active import (
     ActiveLivenessConfig,
     BlinkCounter,
+    BlinkTurnLeftRightChallenge,
     MediaPipeActiveLivenessChecker,
     VideoDecodeError,
     VideoFrame,
@@ -88,6 +89,78 @@ def test_blink_counter_respects_cooldown() -> None:
     assert counter.blinks == 1
 
 
+def test_blink_turn_left_right_challenge_completes_in_order() -> None:
+    challenge = BlinkTurnLeftRightChallenge(
+        ActiveLivenessConfig(
+            closed_eye_threshold=0.20,
+            open_eye_threshold=0.24,
+            min_closed_frames=2,
+            min_open_frames=2,
+            min_head_turn_frames=2,
+            head_turn_yaw_threshold=10.0,
+        )
+    )
+
+    observations = [
+        (0.18, 0.0),
+        (0.17, 0.0),
+        (0.25, 0.0),
+        (0.26, 0.0),
+        (0.18, 0.0),
+        (0.17, 0.0),
+        (0.25, 0.0),
+        (0.26, 0.0),
+        (0.30, -12.0),
+        (0.30, -13.0),
+        (0.30, 12.0),
+        (0.30, 13.0),
+    ]
+    for index, (ear, yaw) in enumerate(observations):
+        challenge.observe(
+            eye_aspect_ratio=ear,
+            yaw=yaw,
+            timestamp_ms=index * 100,
+        )
+
+    assert challenge.completed is True
+    assert challenge.score == 1.0
+
+
+def test_blink_turn_left_right_requires_order() -> None:
+    challenge = BlinkTurnLeftRightChallenge(
+        ActiveLivenessConfig(
+            closed_eye_threshold=0.20,
+            open_eye_threshold=0.24,
+            min_closed_frames=2,
+            min_open_frames=2,
+            min_head_turn_frames=2,
+            head_turn_yaw_threshold=10.0,
+        )
+    )
+
+    observations = [
+        (0.30, -13.0),
+        (0.30, -13.0),
+        (0.18, 0.0),
+        (0.17, 0.0),
+        (0.25, 0.0),
+        (0.26, 0.0),
+        (0.18, 0.0),
+        (0.17, 0.0),
+        (0.25, 0.0),
+        (0.26, 0.0),
+    ]
+    for index, (ear, yaw) in enumerate(observations):
+        challenge.observe(
+            eye_aspect_ratio=ear,
+            yaw=yaw,
+            timestamp_ms=index * 100,
+        )
+
+    assert challenge.completed is False
+    assert challenge.reason == "left_turn_not_completed"
+
+
 def test_check_accepts_string_challenge_before_model_lookup(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -102,6 +175,25 @@ def test_check_accepts_string_challenge_before_model_lookup(
     )
 
     result = checker.check(b"fake-video", challenge="blink_twice")
+
+    assert result.passed is False
+    assert result.label == "model_not_found"
+
+
+def test_check_accepts_composite_string_challenge_before_model_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checker = MediaPipeActiveLivenessChecker(
+        model_path="missing.task",
+        config=ActiveLivenessConfig(min_seconds=0.0, max_seconds=9.0),
+    )
+    monkeypatch.setattr(
+        mediapipe_active,
+        "_decode_video",
+        lambda _video: ([VideoFrame(image_rgb=object(), timestamp_ms=0)], 1.0),
+    )
+
+    result = checker.check(b"fake-video", challenge="blink_turn_left_right")
 
     assert result.passed is False
     assert result.label == "model_not_found"
