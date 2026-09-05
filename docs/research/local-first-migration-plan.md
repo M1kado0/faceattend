@@ -285,6 +285,51 @@ matrices, then extract existing CV behavior without importing FastAPI or Qt.
 - `--save-dir` remains available when a persistent diagnostic location is
   explicitly desired; `--show` remains optional for interactive OpenCV windows.
 
+**2026-09-05 — MiniFASNet passive-liveness adapter (IN_PROGRESS)**
+
+- Added a headless `MiniFASNetPassiveLivenessDetector` that wraps the existing
+  MiniFASNetV2 implementation without changing its preprocessing or score
+  semantics.
+- The adapter accepts aligned workflow frames plus one face per frame, lazily
+  loads the model, exposes model metadata, and returns typed passive-liveness
+  evidence.
+- Temporal windows use the minimum frame score, so one failed frame cannot be
+  hidden by a higher-scoring frame.
+- Added fake-model tests for pass/fail windows, one-time loading, invalid input,
+  and invalid scores. Verification: 18 focused tests passed; Ruff and
+  `mypy src` passed. Real MiniFASNet weights and attack-protocol evaluation
+  remain pending.
+
+**2026-09-05 — Real MiniFASNet smoke test (IN_PROGRESS)**
+
+- Loaded `models/MiniFASNetV2.onnx` successfully through the headless adapter
+  and evaluated one detected face from an existing local static image.
+- Result: decision `failed`, score `0.0811316`, threshold `0.85`.
+- Evidence boundary: this static image is not a bona-fide live-camera sample,
+  so the result only confirms model loading and output plumbing. It is not a
+  model-quality or threshold-calibration result.
+- Next evidence required: a consented live-camera bona-fide sample and
+  attack-specific print/display/replay samples under a documented protocol.
+
+**2026-09-05 — Webcam headless-pipeline smoke-test mode (IN_PROGRESS)**
+
+- Extended `scripts/test_headless_pipeline.py` with a webcam mode using
+  `--camera`, `--camera-index`, and `--frames`. It captures a bounded sequence,
+  requires exactly one detected face per frame, evaluates the passive-liveness
+  window, then aligns and embeds the final frame.
+- The script now adds both the repository root and `src/` to `sys.path`, so it
+  can use the new `faceattend` adapters together with the existing root-level
+  `ml` MiniFASNet implementation when run directly with `uv`.
+- Image mode was re-run successfully: one face, five landmarks, a 112x112
+  aligned crop, and a normalized 512-D embedding. MiniFASNet returned
+  `failed` with score `0.081132` against threshold `0.85`; this remains a
+  plumbing/static-image smoke result, not liveness quality evidence.
+- Verification: Ruff passed for the script. No webcam run was performed in
+  this turn; a consented live-camera sample is still required.
+- Next gate: run the webcam mode locally, inspect frame-count/face-continuity
+  behavior, and collect bona-fide plus attack samples under a documented
+  protocol before changing thresholds or liveness policy.
+
 ## Update template
 
 Copy this block into the latest execution record after each turn:

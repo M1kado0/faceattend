@@ -18,6 +18,10 @@ from faceattend.vision.head_pose import (
     estimate_solvepnp_head_pose,
 )
 from faceattend.vision.model_lifecycle import LazyModel
+from faceattend.vision.passive_liveness import (
+    MiniFASNetPassiveLivenessDetector,
+    PassiveLivenessError,
+)
 
 __all__ = [
     "CanonicalSolvePnPHeadPoseEstimator",
@@ -34,6 +38,8 @@ __all__ = [
     "InsightFaceDetector",
     "InsightFaceEmbedder",
     "LazyModel",
+    "MiniFASNetPassiveLivenessDetector",
+    "PassiveLivenessError",
     "PoseHysteresis",
     "estimate_matrix_head_pose",
     "estimate_solvepnp_head_pose",
