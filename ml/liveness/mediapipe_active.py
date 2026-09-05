@@ -16,12 +16,18 @@ from mediapipe.tasks.python.vision import FaceLandmarker, FaceLandmarkerOptions,
 
 # Allow `uv run ml/liveness/mediapipe_active.py` from the repo root while keeping
 # package imports for normal app/test execution.
-if __name__ == "__main__" and __package__ is None:
-    sys.path.append(str(Path(__file__).resolve().parents[2]))
+if __name__ == "__main__":
+    repository_root = Path(__file__).resolve().parents[2]
+    sys.path.append(str(repository_root))
+    sys.path.append(str(repository_root / "src"))
 
+from faceattend.vision.head_pose import (
+    HeadPoseError,
+    compare_pose_estimators,
+    estimate_solvepnp_head_pose,
+)
 from ml.liveness.base import LivenessResult
 from ml.liveness.challenge import ActiveLivenessChallenge
-from ml.liveness.head_pose import estimate_head_pose
 
 RIGHT_EYE = (33, 159, 158, 133, 153, 145)
 LEFT_EYE = (362, 380, 374, 263, 386, 385)
@@ -384,7 +390,11 @@ class MediaPipeActiveLivenessChecker:
                 running_mode=RunningMode.VIDEO,
                 num_faces=self.config.max_faces + 1,
                 output_face_blendshapes=False,
-                output_facial_transformation_matrixes=False,
+                # Keep MediaPipe's facial transform available for validation
+                # against the calibrated solvePnP estimate. The matrix is
+                # diagnostic evidence; solvePnP remains the challenge input
+                # until camera-based comparison establishes agreement.
+                output_facial_transformation_matrixes=True,
             )
             self._landmarker = FaceLandmarker.create_from_options(options)
         return self._landmarker
@@ -504,11 +514,33 @@ class MediaPipeActiveLivenessChecker:
             landmarks = result.face_landmarks[0]
             eye_aspect_ratio = _average_eye_aspect_ratio(landmarks)
             image_height, image_width = frame.image_rgb.shape[:2]
-            head_pose = estimate_head_pose(
-                landmarks,
-                image_width=image_width,
-                image_height=image_height,
-            )
+            matrix_list = getattr(result, "facial_transformation_matrixes", ())
+            comparison = None
+            if matrix_list:
+                try:
+                    comparison = compare_pose_estimators(
+                        matrix_list[0],
+                        landmarks,
+                        image_width=image_width,
+                        image_height=image_height,
+                    )
+                except (HeadPoseError, IndexError, TypeError, ValueError):
+                    comparison = None
+
+            # Use the validated calibrated estimate for challenge decisions.
+            # Fall back to it directly when older MediaPipe runtimes do not
+            # expose transformation matrices.
+            if comparison is not None:
+                head_pose = comparison.solvepnp_pose
+            else:
+                try:
+                    head_pose = estimate_solvepnp_head_pose(
+                        landmarks,
+                        image_width=image_width,
+                        image_height=image_height,
+                    )
+                except (HeadPoseError, IndexError, TypeError, ValueError):
+                    head_pose = None
             if head_pose is None:
                 print(
                     "[head-pose-debug]",
@@ -523,13 +555,24 @@ class MediaPipeActiveLivenessChecker:
                     f"timestamp_ms={timestamp_ms}",
                     f"stage={challenge.stage}",
                     f"ear={eye_aspect_ratio:.3f}",
-                    f"yaw={head_pose.yaw:.2f}",
-                    f"pitch={head_pose.pitch:.2f}",
-                    f"roll={head_pose.roll:.2f}",
+                    f"yaw={head_pose.yaw_degrees:.2f}",
+                    f"pitch={head_pose.pitch_degrees:.2f}",
+                    f"roll={head_pose.roll_degrees:.2f}",
                 )
+                if comparison is not None:
+                    error = comparison.absolute_error_degrees
+                    print(
+                        "[head-pose-compare]",
+                        f"matrix_yaw={comparison.matrix_pose.yaw_degrees:.2f}",
+                        f"matrix_pitch={comparison.matrix_pose.pitch_degrees:.2f}",
+                        f"matrix_roll={comparison.matrix_pose.roll_degrees:.2f}",
+                        f"error_yaw={error.yaw_degrees:.2f}",
+                        f"error_pitch={error.pitch_degrees:.2f}",
+                        f"error_roll={error.roll_degrees:.2f}",
+                    )
             challenge.observe(
                 eye_aspect_ratio=eye_aspect_ratio,
-                yaw=head_pose.yaw if head_pose else None,
+                yaw=head_pose.yaw_degrees if head_pose else None,
                 timestamp_ms=timestamp_ms,
             )
 

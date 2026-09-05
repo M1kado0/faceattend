@@ -19,7 +19,9 @@ Float64Array = NDArray[np.float64]
 
 # MediaPipe landmark indices: nose tip, image-left eye, image-right eye,
 # image-left mouth, image-right mouth, chin. The canonical model uses the
-# same image-coordinate convention: +x right, +y down, +z away from camera.
+# image-coordinate convention: image x increases right and image y increases
+# down. The canonical object model uses the conventional +y-up face frame;
+# its projection therefore places eyes above the mouth and chin.
 CANONICAL_LANDMARK_INDICES = (1, 33, 263, 61, 291, 199)
 CANONICAL_FACE_POINTS: Float64Array = np.array(
     [
@@ -36,6 +38,24 @@ CANONICAL_FACE_POINTS: Float64Array = np.array(
 
 class HeadPoseError(ValueError):
     """Raised when landmarks or a transformation matrix cannot yield a pose."""
+
+
+@dataclass(frozen=True, slots=True)
+class PoseComparison:
+    """Side-by-side pose estimates used for validation diagnostics."""
+
+    matrix_pose: HeadPose
+    solvepnp_pose: HeadPose
+
+    @property
+    def absolute_error_degrees(self) -> HeadPose:
+        return HeadPose(
+            yaw_degrees=abs(self.matrix_pose.yaw_degrees - self.solvepnp_pose.yaw_degrees),
+            pitch_degrees=abs(
+                self.matrix_pose.pitch_degrees - self.solvepnp_pose.pitch_degrees
+            ),
+            roll_degrees=abs(self.matrix_pose.roll_degrees - self.solvepnp_pose.roll_degrees),
+        )
 
 
 def _landmark_xy(landmark: Any, width: int, height: int) -> tuple[float, float]:
@@ -112,11 +132,19 @@ def estimate_solvepnp_head_pose(
     distortion_coefficients = (
         np.zeros((4, 1), dtype=np.float64) if distortion is None else distortion
     )
+    initial_rotation = np.zeros((3, 1), dtype=np.float64)
+    initial_translation = np.array(
+        [[0.0], [0.0], [max(float(intrinsics[0, 0]), float(intrinsics[1, 1]))]],
+        dtype=np.float64,
+    )
     success, rotation_vector, _translation = cv2.solvePnP(
         CANONICAL_FACE_POINTS,
         points_2d,
         intrinsics,
         distortion_coefficients,
+        rvec=initial_rotation,
+        tvec=initial_translation,
+        useExtrinsicGuess=True,
         flags=cv2.SOLVEPNP_ITERATIVE,
     )
     if not success:
@@ -137,6 +165,28 @@ def estimate_matrix_head_pose(matrix: Float64Array) -> HeadPose:
     if not np.isfinite(rotation).all():
         raise HeadPoseError("transformation matrix contains non-finite values")
     return _rotation_to_pose(rotation)
+
+
+def compare_pose_estimators(
+    matrix: Float64Array,
+    landmarks: Any,
+    *,
+    image_width: int,
+    image_height: int,
+    camera_matrix: Float64Array | None = None,
+    distortion: Float64Array | None = None,
+) -> PoseComparison:
+    """Compare MediaPipe's matrix pose with calibrated landmark ``solvePnP``."""
+    return PoseComparison(
+        matrix_pose=estimate_matrix_head_pose(matrix),
+        solvepnp_pose=estimate_solvepnp_head_pose(
+            landmarks,
+            image_width=image_width,
+            image_height=image_height,
+            camera_matrix=camera_matrix,
+            distortion=distortion,
+        ),
+    )
 
 
 class CanonicalSolvePnPHeadPoseEstimator:

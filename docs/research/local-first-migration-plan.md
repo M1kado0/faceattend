@@ -330,6 +330,97 @@ matrices, then extract existing CV behavior without importing FastAPI or Qt.
   behavior, and collect bona-fide plus attack samples under a documented
   protocol before changing thresholds or liveness policy.
 
+**2026-09-05 — MediaPipe pose-matrix comparison (IN_PROGRESS)**
+
+- Enabled `output_facial_transformation_matrixes` in the legacy MediaPipe
+  Face Landmarker options so real matrix output is available during active
+  liveness processing.
+- Added a headless `PoseComparison` result that compares MediaPipe matrix
+  Euler angles with the calibrated canonical-face `solvePnP` estimator and
+  reports absolute per-axis error.
+- Active challenge decisions now use the calibrated `solvePnP` pose. Matrix
+  values are diagnostic only until real-camera agreement is measured; direct
+  `solvePnP` remains the fallback for runtimes that expose no matrix.
+- Added deterministic neutral, left/right yaw, up/down pitch, roll, and
+  invalid-input comparison tests. Verification: 36 focused tests passed,
+  Ruff passed, and `mypy src` passed.
+- Evidence boundary: synthetic rotation matrices validate extraction and
+  conventions, not MediaPipe camera accuracy. A consented webcam comparison
+  and attack-protocol measurements are still required.
+- Next gate: run the active-liveness path with a local Face Landmarker model,
+  collect matrix-versus-solvePnP errors for controlled poses, and decide
+  whether matrix output can become the primary estimator.
+
+**2026-09-05 — Standalone MediaPipe import fix (IN_PROGRESS)**
+
+- Added repository-root and `src/` path bootstrapping for direct
+  `python -m ml.liveness.mediapipe_active` execution.
+- Verification: the module starts without the previous `faceattend` import
+  error; 36 MediaPipe/head-pose tests passed and Ruff passed.
+- Limitation: this module has no command-line video runner, so launching it
+  only validates imports. Matrix-versus-`solvePnP` output requires invoking
+  `MediaPipeActiveLivenessChecker.check()` with a decoded video or adding a
+  dedicated diagnostic script.
+
+**2026-09-05 — Webcam pose-comparison diagnostic (IN_PROGRESS)**
+
+- Added `scripts/compare_head_pose_webcam.py` as a focused diagnostic rather
+  than expanding the full detector/liveness smoke test.
+- The script captures a bounded webcam sequence, runs MediaPipe Face
+  Landmarker with transformation matrices enabled, compares matrix and
+  calibrated `solvePnP` yaw/pitch/roll values per frame, and prints mean
+  absolute errors. It writes no frames or biometric images.
+- It reports no-face, multiple-face, missing-matrix, camera-read, and pose
+  errors separately and returns failure when no comparable frame is produced.
+- Ruff passed and `--help` ran successfully. A one-frame local smoke attempt
+  was blocked by macOS camera permission (`camera access has been denied`);
+  no pose measurements were collected.
+- Next gate: grant camera permission and run the diagnostic through neutral,
+  left/right yaw, up/down pitch, and roll movements; record errors without
+  changing the estimator or liveness thresholds yet.
+
+**2026-09-05 — Real stationary pose comparison (IN_PROGRESS)**
+
+- A 60-frame camera-1 run produced stable MediaPipe matrix values around
+  yaw `2°`, pitch `-9°`, roll `-3°`, but the solvePnP output reported pitch
+  around `173°`, yielding roughly `181°` pitch error while the head was still.
+- This is measured evidence that the previous canonical 3D model orientation
+  was wrong for image coordinates: eye and mouth vertical positions were
+  inverted, creating the alternate upside-down solvePnP solution.
+- Corrected the canonical model so image y increases downward (eyes above
+  mouth/chin). Deterministic pose tests still pass (21 tests).
+- A follow-up camera run in this environment was blocked by macOS camera
+  permission, so corrected real-camera error is not yet measured.
+- Next gate: rerun `compare_head_pose_webcam.py` after camera permission is
+  available and verify stationary pitch is near zero and matrix/solvePnP
+  errors are acceptably small before using pose for liveness decisions.
+
+**2026-09-05 — solvePnP mirrored-solution mitigation (IN_PROGRESS)**
+
+- A second 60-frame run showed the previous vertical correction changed the
+  failure from a 173° pitch branch to a roughly 177° roll branch. MediaPipe
+  remained stable near neutral, so solvePnP was still selecting a mirrored
+  solution rather than estimating the camera pose reliably.
+- Restored the conventional +y-up canonical face model (which projects eyes
+  above mouth/chin in image coordinates) and added a neutral positive-depth
+  extrinsic initial guess to iterative `solvePnP`.
+- Deterministic pose tests remain green (21 tests) and Ruff passes. A new
+  camera measurement is required before claiming the mirrored branch is
+  resolved.
+
+**2026-09-05 — solvePnP validation remains failed (IN_PROGRESS)**
+
+- A corrected 60-frame camera-1 run still produced unstable solvePnP poses:
+  pitch frequently near `170°` and roll near `177°`, with occasional large
+  yaw/roll jumps, while MediaPipe remained stable near neutral.
+- Mean absolute errors were approximately yaw `22°`, pitch `168°`, and roll
+  `30°`. This is decisive evidence that the current six-point monocular
+  solvePnP configuration is not suitable for liveness decisions.
+- Do not calibrate thresholds or use these solvePnP angles operationally.
+  The next investigation must inspect landmark correspondence, reprojection
+  error, camera intrinsics, and rotation-convention conversion; MediaPipe
+  matrix output remains the only currently stable runtime signal.
+
 ## Update template
 
 Copy this block into the latest execution record after each turn:

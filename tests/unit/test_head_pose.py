@@ -16,6 +16,7 @@ from faceattend.vision.head_pose import (
     ExponentialPoseSmoother,
     HeadPoseError,
     PoseHysteresis,
+    compare_pose_estimators,
     estimate_matrix_head_pose,
     estimate_solvepnp_head_pose,
 )
@@ -72,6 +73,50 @@ def test_matrix_estimator_uses_degrees_without_arbitrary_scaling() -> None:
     assert pose.pitch_degrees == pytest.approx(0.0, abs=0.01)
     assert pose.yaw_degrees == pytest.approx(-18.0, abs=0.01)
     assert pose.roll_degrees == pytest.approx(0.0, abs=0.01)
+
+
+@pytest.mark.parametrize(
+    "angles",
+    [(0.0, 0.0, 0.0), (0.0, -20.0, 0.0), (0.0, 20.0, 0.0), (15.0, 0.0, 0.0), (0.0, 0.0, 15.0)],
+)
+def test_matrix_and_solvepnp_agree_on_controlled_pose(
+    angles: tuple[float, float, float],
+) -> None:
+    rotation_vector = np.deg2rad(np.array(angles, dtype=np.float64)).reshape(3, 1)
+    rotation, _ = cv2.Rodrigues(rotation_vector)
+    transform = np.eye(4, dtype=np.float64)
+    transform[:3, :3] = rotation
+
+    comparison = compare_pose_estimators(
+        transform,
+        _projected_landmarks(angles),
+        image_width=640,
+        image_height=480,
+    )
+
+    error = comparison.absolute_error_degrees
+    assert error.yaw_degrees < 0.2
+    assert error.pitch_degrees < 0.2
+    assert error.roll_degrees < 0.2
+
+
+def test_pose_comparison_rejects_invalid_matrix_or_landmarks() -> None:
+    with pytest.raises(HeadPoseError, match="transformation matrix"):
+        compare_pose_estimators(
+            np.zeros((2, 2)),
+            _projected_landmarks((0.0, 0.0, 0.0)),
+            image_width=640,
+            image_height=480,
+        )
+
+    rotation = np.eye(4, dtype=np.float64)
+    with pytest.raises(HeadPoseError, match="incomplete"):
+        compare_pose_estimators(
+            rotation,
+            np.zeros((2, 2)),
+            image_width=640,
+            image_height=480,
+        )
 
 
 def test_pose_estimator_protocol_adapter_uses_frame_dimensions() -> None:
