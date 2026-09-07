@@ -23,9 +23,7 @@ def _frame() -> Frame:
 
 def test_align_returns_arcface_sized_bgr_image() -> None:
     face = _face(
-        np.array(
-            [[170.0, 160.0], [230.0, 160.0], [200.0, 195.0], [180.0, 230.0], [220.0, 230.0]]
-        )
+        np.array([[170.0, 160.0], [230.0, 160.0], [200.0, 195.0], [180.0, 230.0], [220.0, 230.0]])
     )
 
     aligned = InsightFaceAligner().align(_frame(), face)

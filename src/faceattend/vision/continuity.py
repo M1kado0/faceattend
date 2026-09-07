@@ -45,11 +45,13 @@ class FaceContinuityTracker:
         self._last_frame_ns: int | None = None
         self._last_valid_timestamp_ns: int | None = None
         self._last_face: FaceObservation | None = None
+        self._face_was_missing = False
 
     def reset(self) -> None:
         self._last_frame_ns = None
         self._last_valid_timestamp_ns = None
         self._last_face = None
+        self._face_was_missing = False
 
     def observe(
         self,
@@ -64,6 +66,7 @@ class FaceContinuityTracker:
             if self._last_face is None:
                 return ContinuityResult(ContinuityStatus.FAILED, "no_face")
             assert self._last_valid_timestamp_ns is not None
+            self._face_was_missing = True
             gap_ms = (frame.captured_at_ns - self._last_valid_timestamp_ns) / 1_000_000
             if gap_ms <= self.config.max_gap_ms:
                 return ContinuityResult(ContinuityStatus.WAITING, "face_temporarily_missing")
@@ -73,11 +76,13 @@ class FaceContinuityTracker:
 
         face = faces[0]
         if self._last_face is not None:
-            if (
-                self._last_face.track_id is not None
-                and face.track_id is not None
-                and self._last_face.track_id != face.track_id
+            assert self._last_valid_timestamp_ns is not None
+            if self._face_was_missing and (
+                frame.captured_at_ns - self._last_valid_timestamp_ns
+                > self.config.max_gap_ms * 1_000_000
             ):
+                return ContinuityResult(ContinuityStatus.FAILED, "face_missing_too_long")
+            if self._last_face.track_id is not None and self._last_face.track_id != face.track_id:
                 return ContinuityResult(ContinuityStatus.FAILED, "track_changed")
             previous_center = _center(self._last_face)
             current_center = _center(face)
@@ -99,4 +104,5 @@ class FaceContinuityTracker:
 
         self._last_face = face
         self._last_valid_timestamp_ns = frame.captured_at_ns
+        self._face_was_missing = False
         return ContinuityResult(ContinuityStatus.ACCEPTED)

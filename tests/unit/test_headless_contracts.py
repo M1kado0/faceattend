@@ -37,6 +37,21 @@ def test_attendance_cannot_match_before_both_liveness_stages() -> None:
     workflow.transition_to(AttendanceState.MATCHING)
 
 
+@pytest.mark.parametrize("terminal", [AttendanceState.UNKNOWN, AttendanceState.AMBIGUOUS])
+def test_unknown_or_ambiguous_match_cannot_be_recorded(
+    terminal: AttendanceState,
+) -> None:
+    workflow = new_attendance_state_machine()
+    workflow.transition_to(AttendanceState.ACQUIRING)
+    workflow.transition_to(AttendanceState.ACTIVE_LIVENESS)
+    workflow.transition_to(AttendanceState.PASSIVE_LIVENESS)
+    workflow.transition_to(AttendanceState.MATCHING)
+    workflow.transition_to(terminal)
+
+    with pytest.raises(StateTransitionError):
+        workflow.transition_to(AttendanceState.PERSISTING)
+
+
 def test_frame_and_observation_are_typed_transient_values() -> None:
     frame = Frame(
         pixels=np.zeros((2, 2, 3), dtype=np.uint8),

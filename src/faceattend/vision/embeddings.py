@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 from insightface.model_zoo import get_model  # type: ignore[import-untyped]
 
-from faceattend.vision.model_lifecycle import LazyModel
+from faceattend.vision.model_lifecycle import LazyModel, file_sha256
 from faceattend.vision.types import Float32Array, ModelMetadata, UInt8Array
 
 
@@ -34,7 +34,10 @@ class InsightFaceEmbedder:
         providers: Sequence[str] = ("CPUExecutionProvider",),
         model_loader: Callable[[], Any] | None = None,
     ) -> None:
-        self._metadata = ModelMetadata(model_name, model_version, model_checksum)
+        checksum = model_checksum
+        if checksum == "unknown":
+            checksum = file_sha256(model_path)
+        self._metadata = ModelMetadata(model_name, model_version, checksum)
 
         def load() -> Any:
             if model_loader is not None:

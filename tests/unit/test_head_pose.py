@@ -15,6 +15,7 @@ from faceattend.vision.head_pose import (
     CanonicalSolvePnPHeadPoseEstimator,
     ExponentialPoseSmoother,
     HeadPoseError,
+    MediaPipeMatrixHeadPoseEstimator,
     PoseHysteresis,
     compare_pose_estimators,
     estimate_matrix_head_pose,
@@ -98,6 +99,29 @@ def test_matrix_and_solvepnp_agree_on_controlled_pose(
     assert error.yaw_degrees < 0.2
     assert error.pitch_degrees < 0.2
     assert error.roll_degrees < 0.2
+
+
+@pytest.mark.parametrize(
+    ("rotation", "expected"),
+    [
+        ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+        ((0.0, -20.0, 0.0), (-20.0, 0.0, 0.0)),
+        ((0.0, 20.0, 0.0), (20.0, 0.0, 0.0)),
+        ((-15.0, 0.0, 0.0), (0.0, -15.0, 0.0)),
+        ((15.0, 0.0, 0.0), (0.0, 15.0, 0.0)),
+    ],
+)
+def test_mediapipe_matrix_estimator_handles_turns_and_pitch(
+    rotation: tuple[float, float, float], expected: tuple[float, float, float]
+) -> None:
+    rotation_vector = np.deg2rad(np.array(rotation, dtype=np.float64)).reshape(3, 1)
+    matrix, _ = cv2.Rodrigues(rotation_vector)
+
+    pose = MediaPipeMatrixHeadPoseEstimator().estimate(matrix)
+
+    assert pose.yaw_degrees == pytest.approx(expected[0], abs=0.01)
+    assert pose.pitch_degrees == pytest.approx(expected[1], abs=0.01)
+    assert pose.roll_degrees == pytest.approx(expected[2], abs=0.01)
 
 
 def test_pose_comparison_rejects_invalid_matrix_or_landmarks() -> None:
@@ -221,5 +245,14 @@ def test_continuity_fails_long_gap_jump_and_non_monotonic_time() -> None:
     tracker.observe(_frame(0), [_face()])
 
     assert tracker.observe(_frame(200_000_000), []).reason == "face_missing_too_long"
-    assert tracker.observe(_frame(300_000_000), [_face(x=500.0)]).reason == "implausible_face_jump"
-    assert tracker.observe(_frame(300_000_000), [_face()]).reason == "timestamp_not_monotonic"
+    tracker.reset()
+    tracker.observe(_frame(0), [_face()])
+    assert tracker.observe(_frame(100_000_000), [_face(x=500.0)]).reason == "implausible_face_jump"
+    assert tracker.observe(_frame(100_000_000), [_face()]).reason == "timestamp_not_monotonic"
+
+
+def test_continuity_does_not_infer_absence_between_valid_observations() -> None:
+    tracker = FaceContinuityTracker(FaceContinuityConfig(max_gap_ms=100))
+    face = _face()
+    assert tracker.observe(_frame(0), [face]).status is ContinuityStatus.ACCEPTED
+    assert tracker.observe(_frame(2_000_000_000), [face]).status is ContinuityStatus.ACCEPTED

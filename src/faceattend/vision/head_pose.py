@@ -51,9 +51,7 @@ class PoseComparison:
     def absolute_error_degrees(self) -> HeadPose:
         return HeadPose(
             yaw_degrees=abs(self.matrix_pose.yaw_degrees - self.solvepnp_pose.yaw_degrees),
-            pitch_degrees=abs(
-                self.matrix_pose.pitch_degrees - self.solvepnp_pose.pitch_degrees
-            ),
+            pitch_degrees=abs(self.matrix_pose.pitch_degrees - self.solvepnp_pose.pitch_degrees),
             roll_degrees=abs(self.matrix_pose.roll_degrees - self.solvepnp_pose.roll_degrees),
         )
 
@@ -187,6 +185,13 @@ def compare_pose_estimators(
             distortion=distortion,
         ),
     )
+
+
+class MediaPipeMatrixHeadPoseEstimator:
+    """Headless adapter for MediaPipe facial transformation matrices."""
+
+    def estimate(self, matrix: Float64Array) -> HeadPose:
+        return estimate_matrix_head_pose(matrix)
 
 
 class CanonicalSolvePnPHeadPoseEstimator:

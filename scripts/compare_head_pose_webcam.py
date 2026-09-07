@@ -2,14 +2,18 @@
 
 Run from the repository root:
 
-    uv run python scripts/compare_head_pose_webcam.py
+    uv run python scripts/compare_head_pose_webcam.py --phase neutral --csv pose.csv
+    uv run python scripts/compare_head_pose_webcam.py --phase left --csv pose.csv
 
-No frames or biometric images are written to disk.
+Repeat once per phase (neutral, left, right, up, down, roll). Only pose
+angles are written when ``--csv`` is supplied; no frames or biometric images
+are stored.
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
 import time
 from pathlib import Path
@@ -50,11 +54,22 @@ def main() -> int:
     parser.add_argument(
         "--model",
         type=Path,
-        default=Path("/models/face_landmarker_v2_with_blendshapes.task"),
+        default=repo_root / "models/face_landmarker_v2_with_blendshapes.task",
         help="MediaPipe Face Landmarker task model.",
     )
     parser.add_argument("--camera-index", type=int, default=1)
     parser.add_argument("--frames", type=int, default=60)
+    parser.add_argument(
+        "--phase",
+        choices=("neutral", "left", "right", "up", "down", "roll"),
+        default="neutral",
+        help="Label for this separate calibration capture.",
+    )
+    parser.add_argument(
+        "--csv",
+        type=Path,
+        help="Append pose samples to this CSV (angles only; no images).",
+    )
     args = parser.parse_args()
 
     if args.frames <= 0:
@@ -81,7 +96,7 @@ def main() -> int:
     try:
         with FaceLandmarker.create_from_options(options) as landmarker:
             print(f"Capturing {args.frames} frames from camera {args.camera_index}.")
-            print("Keep one face visible; move slowly through neutral, turns, pitch, and roll.")
+            print(f"Phase: {args.phase}. Hold this pose steadily for the capture.")
             for frame_number in range(1, args.frames + 1):
                 ok, frame_bgr = camera.read()
                 if not ok:
@@ -127,6 +142,47 @@ def main() -> int:
 
     print(f"Compared frames: {len(comparisons)}/{args.frames}")
     if comparisons:
+        matrix_angles = np.array(
+            [
+                [
+                    item.matrix_pose.yaw_degrees,
+                    item.matrix_pose.pitch_degrees,
+                    item.matrix_pose.roll_degrees,
+                ]
+                for item in comparisons
+            ],
+            dtype=np.float64,
+        )
+        labels = ("yaw", "pitch", "roll")
+        print(f"MediaPipe {args.phase} statistics (degrees):")
+        for column, label in enumerate(labels):
+            values = matrix_angles[:, column]
+            print(
+                f"  {label}: median={np.median(values):.2f}, "
+                f"min={values.min():.2f}, max={values.max():.2f}, "
+                f"range={np.ptp(values):.2f}"
+            )
+
+        if args.csv:
+            args.csv.parent.mkdir(parents=True, exist_ok=True)
+            write_header = not args.csv.exists() or args.csv.stat().st_size == 0
+            with args.csv.open("a", newline="") as output:
+                writer = csv.writer(output)
+                if write_header:
+                    writer.writerow(("phase", "frame", "yaw", "pitch", "roll"))
+                for frame_number, item in enumerate(comparisons, start=1):
+                    pose = item.matrix_pose
+                    writer.writerow(
+                        (
+                            args.phase,
+                            frame_number,
+                            f"{pose.yaw_degrees:.6f}",
+                            f"{pose.pitch_degrees:.6f}",
+                            f"{pose.roll_degrees:.6f}",
+                        )
+                    )
+            print(f"Saved angle samples: {args.csv}")
+
         errors = np.array(
             [
                 [

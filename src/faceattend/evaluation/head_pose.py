@@ -66,8 +66,7 @@ def validate_pose_samples(
 
     errors = [_axis_errors(sample.expected, sample.estimated) for sample in samples]
     passed_count = sum(
-        all(error <= tolerance_degrees for error in sample_errors)
-        for sample_errors in errors
+        all(error <= tolerance_degrees for error in sample_errors) for sample_errors in errors
     )
     mean = HeadPose(
         yaw_degrees=sum(error[0] for error in errors) / len(errors),

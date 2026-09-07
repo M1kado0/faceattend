@@ -8,11 +8,11 @@ from typing import Any
 import numpy as np
 from insightface.model_zoo import get_model  # type: ignore[import-untyped]
 
-from faceattend.vision.model_lifecycle import LazyModel
+from faceattend.vision.model_lifecycle import LazyModel, file_sha256
+from faceattend.vision.quality import measure_quality
 from faceattend.vision.types import (
     BoundingBox,
     FaceObservation,
-    FaceQuality,
     Frame,
     ModelMetadata,
 )
@@ -44,14 +44,13 @@ def _observation(
         raise FaceDetectionError("detector returned an invalid bounding box")
 
     x_min, y_min, x_max, y_max = (float(value) for value in bbox_values[:4])
-    height, width = frame.pixels.shape[:2]
-    area_ratio = max(0.0, x_max - x_min) * max(0.0, y_max - y_min) / (width * height)
+    box = BoundingBox(x_min, y_min, x_max, y_max)
+    points = _landmarks(keypoints)
     return FaceObservation(
-        bbox=BoundingBox(x_min, y_min, x_max, y_max),
+        bbox=box,
         detector_score=float(score),
-        landmarks=_landmarks(keypoints),
-        # Detection is not the final blur/brightness/size quality policy.
-        quality=FaceQuality(True, 0.0, 0.0, area_ratio),
+        landmarks=points,
+        quality=measure_quality(frame, box, points),
     )
 
 
@@ -70,7 +69,10 @@ class InsightFaceDetector:
         det_threshold: float = 0.5,
         model_loader: Callable[[], Any] | None = None,
     ) -> None:
-        self._metadata = ModelMetadata(model_name, model_version, model_checksum)
+        checksum = model_checksum
+        if checksum == "unknown":
+            checksum = file_sha256(model_path)
+        self._metadata = ModelMetadata(model_name, model_version, checksum)
         self._det_size = det_size
         self._det_threshold = det_threshold
 

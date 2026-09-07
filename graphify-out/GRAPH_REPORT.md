@@ -1,16 +1,16 @@
-# Graph Report - faceguard  (2026-09-05)
+# Graph Report - faceguard  (2026-09-07)
 
 ## Corpus Check
-- 170 files · ~237,624 words
+- 197 files · ~263,393 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1329 nodes · 1918 edges · 151 communities (97 shown, 54 thin omitted)
-- Extraction: 80% EXTRACTED · 20% INFERRED · 0% AMBIGUOUS · INFERRED: 381 edges (avg confidence: 0.64)
+- 1941 nodes · 3505 edges · 195 communities (138 shown, 57 thin omitted)
+- Extraction: 68% EXTRACTED · 32% INFERRED · 0% AMBIGUOUS · INFERRED: 1105 edges (avg confidence: 0.62)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `eb8907c1`
+- Built from commit: `96634277`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -130,36 +130,81 @@
 - [[_COMMUNITY_Community 112|Community 112]]
 - [[_COMMUNITY_Community 113|Community 113]]
 - [[_COMMUNITY_Community 114|Community 114]]
+- [[_COMMUNITY_Community 115|Community 115]]
+- [[_COMMUNITY_Community 116|Community 116]]
+- [[_COMMUNITY_Community 117|Community 117]]
+- [[_COMMUNITY_Community 118|Community 118]]
+- [[_COMMUNITY_Community 119|Community 119]]
+- [[_COMMUNITY_Community 120|Community 120]]
+- [[_COMMUNITY_Community 121|Community 121]]
+- [[_COMMUNITY_Community 122|Community 122]]
+- [[_COMMUNITY_Community 123|Community 123]]
+- [[_COMMUNITY_Community 124|Community 124]]
+- [[_COMMUNITY_Community 125|Community 125]]
+- [[_COMMUNITY_Community 126|Community 126]]
+- [[_COMMUNITY_Community 127|Community 127]]
+- [[_COMMUNITY_Community 128|Community 128]]
+- [[_COMMUNITY_Community 129|Community 129]]
+- [[_COMMUNITY_Community 130|Community 130]]
+- [[_COMMUNITY_Community 131|Community 131]]
+- [[_COMMUNITY_Community 132|Community 132]]
+- [[_COMMUNITY_Community 133|Community 133]]
+- [[_COMMUNITY_Community 134|Community 134]]
+- [[_COMMUNITY_Community 135|Community 135]]
+- [[_COMMUNITY_Community 136|Community 136]]
+- [[_COMMUNITY_Community 137|Community 137]]
+- [[_COMMUNITY_Community 138|Community 138]]
+- [[_COMMUNITY_Community 139|Community 139]]
+- [[_COMMUNITY_Community 140|Community 140]]
+- [[_COMMUNITY_Community 141|Community 141]]
+- [[_COMMUNITY_Community 142|Community 142]]
+- [[_COMMUNITY_Community 143|Community 143]]
+- [[_COMMUNITY_Community 144|Community 144]]
 - [[_COMMUNITY_Community 145|Community 145]]
 - [[_COMMUNITY_Community 146|Community 146]]
 - [[_COMMUNITY_Community 147|Community 147]]
 - [[_COMMUNITY_Community 148|Community 148]]
 - [[_COMMUNITY_Community 149|Community 149]]
 - [[_COMMUNITY_Community 150|Community 150]]
+- [[_COMMUNITY_Community 151|Community 151]]
+- [[_COMMUNITY_Community 152|Community 152]]
+- [[_COMMUNITY_Community 153|Community 153]]
+- [[_COMMUNITY_Community 154|Community 154]]
+- [[_COMMUNITY_Community 155|Community 155]]
+- [[_COMMUNITY_Community 156|Community 156]]
+- [[_COMMUNITY_Community 157|Community 157]]
+- [[_COMMUNITY_Community 158|Community 158]]
+- [[_COMMUNITY_Community 159|Community 159]]
+- [[_COMMUNITY_Community 189|Community 189]]
+- [[_COMMUNITY_Community 190|Community 190]]
+- [[_COMMUNITY_Community 191|Community 191]]
+- [[_COMMUNITY_Community 192|Community 192]]
+- [[_COMMUNITY_Community 193|Community 193]]
+- [[_COMMUNITY_Community 194|Community 194]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Frame` - 36 edges
-2. `FaceObservation` - 30 edges
-3. `FakeSession` - 29 edges
-4. `MediaPipeActiveLivenessChecker` - 23 edges
-5. `FakeAttendanceClient` - 22 edges
-6. `FakeExecuteResult` - 22 edges
-7. `RecordingIndex` - 20 edges
-8. `ModelMetadata` - 19 edges
-9. `HeadPoseError` - 18 edges
-10. `frontend/AGENTS.md — Public Site` - 18 edges
+1. `Frame` - 85 edges
+2. `ActiveLivenessChallengeEvaluator` - 66 edges
+3. `FaceObservation` - 58 edges
+4. `TemporalPassiveLivenessSession` - 51 edges
+5. `FrameEvidence` - 51 edges
+6. `ActiveLivenessConfig` - 49 edges
+7. `MediaPipeLivenessSession` - 44 edges
+8. `ChallengeAction` - 44 edges
+9. `ModelMetadata` - 42 edges
+10. `LivenessEvidence` - 40 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Liveness Before Registration and Check-In` --semantically_similar_to--> `Current Enrollment and Search Pipeline`  [INFERRED] [semantically similar]
   backend/AGENTS.md → ml/AGENTS.md
-- `Legacy ML Crawler Ingest Pipeline` --semantically_similar_to--> `Legacy Crawler Ingest Pipeline`  [INFERRED] [semantically similar]
-  ml/AGENTS.md → crawler/AGENTS.md
-- `test_empty_validation_set_is_explicit()` --calls--> `validate_pose_samples()`  [INFERRED]
-  tests/unit/test_pose_validation.py → src/faceattend/evaluation/head_pose.py
-- `test_invalid_tolerance_is_rejected()` --calls--> `validate_pose_samples()`  [INFERRED]
-  tests/unit/test_pose_validation.py → src/faceattend/evaluation/head_pose.py
 - `test_embedder_loads_model_once()` --calls--> `InsightFaceEmbedder`  [INFERRED]
   tests/unit/test_embeddings.py → src/faceattend/vision/embeddings.py
+- `test_mediapipe_matrix_estimator_handles_turns_and_pitch()` --calls--> `MediaPipeMatrixHeadPoseEstimator`  [INFERRED]
+  tests/unit/test_head_pose.py → src/faceattend/vision/head_pose.py
+- `test_lazy_model_factory_runs_once()` --calls--> `LazyModel`  [INFERRED]
+  tests/unit/test_head_pose.py → src/faceattend/vision/model_lifecycle.py
+- `Legacy ML Crawler Ingest Pipeline` --semantically_similar_to--> `Legacy Crawler Ingest Pipeline`  [INFERRED] [semantically similar]
+  ml/AGENTS.md → crawler/AGENTS.md
 
 ## Hyperedges (group relationships)
 - **Verified Attendance Flow** — concept_face_registration, concept_attendance_session, concept_liveness_gated_check_in, concept_identity_matching, concept_biometric_audit_log [EXTRACTED 1.00]
@@ -169,295 +214,463 @@
 - **Legacy Public-Image Discovery and Indexing Flow** — legacy_crawler_pipeline, crawler_phash_dedup, crawler_object_storage, crawler_inference_queue, legacy_ml_crawler_ingest, legacy_face_clustering [EXTRACTED 1.00]
 - **Liveness Defense Stack** — minifasnet_passive, mediapipe_active_liveness, deepfake_liveness_check, liveness_calibration [EXTRACTED 1.00]
 
-## Communities (151 total, 54 thin omitted)
+## Communities (195 total, 57 thin omitted)
 
 ### Community 0 - "Media Pipe Active Liveness"
-Cohesion: 0.05
-Nodes (78): Protocol, StrEnum, _frame(), Tests for the injectable InsightFace detector adapter., test_detector_accepts_missing_landmarks_for_later_quality_rejection(), test_detector_loads_model_once_and_maps_face_fields(), _face(), _frame() (+70 more)
+Cohesion: 0.07
+Nodes (40): RuntimeError, _draw_blink_scores(), _draw_face_landmarks(), main(), Preview MediaPipe Face Landmarker output from the webcam., _detector(), _face(), _frame() (+32 more)
 
 ### Community 1 - "Fake Session"
-Cohesion: 0.06
-Nodes (45): LivenessChecker, LivenessResult, LivenessChecker interface., estimate_head_pose(), HeadPose, Head-pose helpers for MediaPipe face landmarks., Estimate pitch/yaw/roll from MediaPipe landmarks with solvePnP., ActiveLivenessConfig (+37 more)
+Cohesion: 0.09
+Nodes (47): NeutralPadConfig, Requirements for the dedicated post-active neutral PAD window., evidence(), PAD, Exercise real evidence guards and active/PAD composition with synthetic pixels., runtime(), test_active_then_pad_success_and_native_pad_failure(), test_camera_callable_converts_processor_exception_to_terminal_failure() (+39 more)
 
 ### Community 2 - "Ml Client.Py"
 Cohesion: 0.07
 Nodes (43): Characterize face-count behavior that the desktop pipeline must preserve., test_current_pipeline_accepts_exactly_one_face(), test_current_pipeline_rejects_multiple_faces(), test_current_pipeline_rejects_no_face(), ActiveLivenessChecker, Active liveness challenge/response checks., ActiveLivenessChallenge, Active liveness challenge definitions. (+35 more)
 
 ### Community 3 - "Faissstore"
+Cohesion: 0.06
+Nodes (36): _evenly_sample(), Helpers for sampling frames from short webcam videos., Raised when a check-in video cannot be sampled., sample_video_frames_as_jpegs(), VideoFrameDecodeError, _capture_camera(), _draw_detection(), _load_image() (+28 more)
+
+### Community 4 - "Test Attendance Routes.Py"
 Cohesion: 0.09
 Nodes (30): _check_in_files(), FakeAttendanceClient, FakeFaceRegistrationClient, _files(), _request_error(), _status_error(), test_attendance_detail_404_returns_record_not_found(), test_attendance_detail_backend_500_returns_attendance_error() (+22 more)
 
-### Community 4 - "Test Attendance Routes.Py"
+### Community 5 - "Liveness Gated Check In"
+Cohesion: 0.06
+Nodes (30): MediaPipeLivenessSession, Discard action history at attempt/challenge boundaries., Discard action history at attempt/challenge boundaries., Runtime composition of MediaPipe active actions and temporal passive PAD., Runtime composition of MediaPipe active actions and temporal passive PAD., Finalize PAD only after active liveness has completed., Runtime composition of MediaPipe active actions and temporal passive PAD., Finalize PAD only after active liveness has completed. (+22 more)
+
+### Community 6 - "Mini Fasnet.Py"
+Cohesion: 0.12
+Nodes (32): BlinkCounter, BlinkTurnLeftRightChallenge, LivenessRuntimePhase, LivenessSessionResult, User-visible stages of the combined active and passive session., Overall decision: an active pass alone never means the attempt passed., Overall decision: an active pass alone never means the attempt passed., Overall decision: an active pass alone never means the attempt passed. (+24 more)
+
+### Community 7 - "Active Liveness Challenge"
 Cohesion: 0.08
 Nodes (23): FAISSStore, _matches_filter(), _normalize(), Faiss implementation of VectorStore., consume_one(), Queue consumer: pulls (image_id, embedding, metadata) and writes to the vector s, Handle a single ingest message from the queue.      Expected payload: {image_id,, clear_store_cache() (+15 more)
 
-### Community 5 - "Liveness Gated Check In"
+### Community 8 - "Sqlmodel"
 Cohesion: 0.05
 Nodes (38): Accessibility, Add a new form, Add a new page, Add an HTMX interaction, Authentication, Backend API Client, Base Template, Beginner Tips (+30 more)
 
-### Community 6 - "Mini Fasnet.Py"
+### Community 9 - "Current Enrollment And Search"
 Cohesion: 0.09
 Nodes (39): Active Liveness, Architecture Decision Record Process, Attendance Session, Backend API Boundary, Biometric Audit Log, Embedding-Only Vector Storage, Face Registration, GDPR Article 9 Biometric Data (+31 more)
 
-### Community 7 - "Active Liveness Challenge"
+### Community 10 - "Fast Api Backend Api"
 Cohesion: 0.1
 Nodes (17): Conv_block, Depth_Wise, Depth_Wise_SE, Flatten, L2Norm, Linear_block, MiniFASNet, MiniFASNetSE (+9 more)
 
-### Community 8 - "Sqlmodel"
+### Community 11 - "Base Model"
 Cohesion: 0.13
-Nodes (21): _attendance_session(), FakeExecuteResult, FakeSession, RecordingIndex, test_check_in_filters_by_embedding_model_after_liveness(), test_check_in_ignores_low_confidence_match(), test_check_in_persists_best_match_across_live_frame_embeddings(), test_check_in_rejects_failed_video_passive_liveness() (+13 more)
+Nodes (22): Protocol, TypedDict, _ModelOptions, ActiveLivenessEvaluator, FaceAligner, FaceAnalyzer, FaceDetector, FaceEmbedder (+14 more)
 
-### Community 9 - "Current Enrollment And Search"
+### Community 12 - "Backend Client"
 Cohesion: 0.06
 Nodes (34): 1. Configure environment, 2. Start dependencies, 3. Run migrations, 4. Start services, 5. Browser flow, 6. Failure cases to demo, Architecture, code:text (register a consenting face) (+26 more)
 
-### Community 10 - "Fast Api Backend Api"
+### Community 13 - "Mini Fasnet"
 Cohesion: 0.06
 Nodes (33): Active (fallback — challenge-response), Add a new liveness check, Benchmarks, Calibration, Clustering, code:block1 (ml/), code:block2 (Image Bytes), code:block3 (Image Bytes) (+25 more)
 
-### Community 11 - "Base Model"
-Cohesion: 0.09
-Nodes (22): _capture_camera(), _draw_detection(), _load_image(), main(), Smoke-test the headless detector, liveness, alignment, and embedder.  Image mode, Display one diagnostic image and wait until a key is pressed., Display one diagnostic image and wait until a key is pressed., Display one diagnostic image and wait until a key is pressed. (+14 more)
+### Community 14 - "Attendance.Py"
+Cohesion: 0.12
+Nodes (25): FrameEvidenceProcessor, test_frame_and_observation_are_typed_transient_values(), test_geometric_quality_gates(), test_measured_sharpness_distinguishes_blur_and_reports_exposure(), test_occlusion_signals_are_advisory_not_glasses_or_mask_diagnoses(), test_quality_config_rejects_invalid_thresholds(), FaceDetectionError, InsightFaceDetector (+17 more)
 
-### Community 12 - "Backend Client"
+### Community 15 - "Ml Test Fixtures. Only"
+Cohesion: 0.13
+Nodes (30): ActiveLivenessConfig, Tuning knobs for blink-based active liveness., Tuning knobs for blink-based active liveness., Tuning knobs for blink-based active liveness., Tuning knobs for blink-based active liveness., Tuning knobs for blink-based active liveness., Tuning knobs for blink-based active liveness., Tuning knobs for blink-based active liveness. (+22 more)
+
+### Community 16 - "Webcam.Js"
+Cohesion: 0.1
+Nodes (21): test_artifact_rejects_changed_weights_even_if_metadata_still_matches(), test_missing_artifact_is_rejected(), test_unpinned_manifest_is_rejected(), EmbeddingError, InsightFaceEmbedder, Headless InsightFace recognition-model adapter., Raised when an aligned face cannot produce a usable embedding., Generate normalized embeddings from already-aligned face images.      The input (+13 more)
+
+### Community 17 - "Auth.Py"
+Cohesion: 0.16
+Nodes (17): _attendance_session(), FakeExecuteResult, FakeSession, test_check_in_filters_by_embedding_model_after_liveness(), test_check_in_rejects_failed_video_passive_liveness(), test_check_in_rejects_identity_mismatch(), test_check_in_rejects_low_face_visible_ratio(), test_check_in_reuses_existing_persisted_match() (+9 more)
+
+### Community 18 - "Base Spider"
+Cohesion: 0.15
+Nodes (24): test_runtime_session_cannot_finalize_pad_before_active_completion(), _evidence(), _FixedSequenceRandom, _pose(), test_challenge_and_session_timeouts_are_explicit(), test_challenge_timeout_is_checked_during_directional_dwell(), test_evidence_boundary_completes_action_challenge(), test_evidence_boundary_reports_invalid_pose() (+16 more)
+
+### Community 19 - "Api.Py"
+Cohesion: 0.1
+Nodes (21): _axis_errors(), PoseValidationSample, PoseValidationSummary, Compare estimated head poses with controlled reference poses., One known-pose observation used for validation., Aggregate error and pass/fail results for a validation set., Summarize pose errors against controlled reference angles.      A sample passes, validate_pose_samples() (+13 more)
+
+### Community 20 - "Users.Py"
 Cohesion: 0.07
 Nodes (28): Add a new API endpoint, Add a new platform takedown integration, Add a new vector DB backend, API Conventions, Attendance Review Workflow, Audit Logging, Authentication, backend/AGENTS.md — Backend Services (+20 more)
 
-### Community 13 - "Mini Fasnet"
+### Community 21 - "Hash.Py"
 Cohesion: 0.12
 Nodes (23): AttendanceRecord, AttendanceReviewOut, AttendanceReviewRequest, AttendanceSession, AttendanceSessionCreate, CheckInResponse, FaceRegistrationResponse, LoginRequest (+15 more)
 
-### Community 14 - "Attendance.Py"
+### Community 22 - "Test Face Pipeline.Py"
 Cohesion: 0.07
 Nodes (26): ADR Process, AGENTS.md — Root Instructions for Claude Code, Attendance Domain, Beginner Notes, code:text (register a consenting face), code:block2 (faceattend/), code:block3 (# Shared), code:block4 (docs/adr/) (+18 more)
 
-### Community 15 - "Ml Test Fixtures. Only"
+### Community 23 - "Threshold Calibration"
+Cohesion: 0.11
+Nodes (21): create_face_analyzer(), HeadlessFaceAnalyzer, ModelCompatibilityError, Headless face processing with an explicit, pinned model contract., Compose existing adapters into a camera-worker evidence processor.      This is, Compose existing adapters into a camera-worker evidence processor.      This is, Compose existing adapters into a camera-worker evidence processor.      This is, Rehash selected files and compare adapter identities at runtime startup. (+13 more)
+
+### Community 24 - "Face Registrations.Py"
+Cohesion: 0.08
+Nodes (25): Active challenge evaluation, Challenge session design, code:text (DATE — Phase N — STATUS), Current decision record, Explicitly rejected for the first version, FaceAttend Local-First Migration Plan, Frame-evidence boundary, Headless tests and real-camera validation (+17 more)
+
+### Community 25 - "Example Spider"
+Cohesion: 0.09
+Nodes (19): MediaPipeActionEvidence, MediaPipeChallengeSessionAdapter, Convert real Face Landmarker landmarks/blendshapes into actions., Convert real Face Landmarker landmarks/blendshapes into actions., Convert real Face Landmarker landmarks/blendshapes into actions., Convert real Face Landmarker landmarks/blendshapes into actions., Convert real Face Landmarker landmarks/blendshapes into actions., Bridge MediaPipe action evidence into the headless challenge evaluator. (+11 more)
+
+### Community 26 - "Email Fallback"
+Cohesion: 0.16
+Nodes (20): _pose(), test_challenge_timeout_is_explicit(), test_direction_requires_neutral_return_before_opposite_turn(), test_evaluator_reset_clears_terminal_and_dwell_state(), test_face_presence_failures_are_explicit(), test_face_substitution_is_rejected(), test_hysteresis_band_counts_toward_existing_dwell_but_cannot_enter(), test_ordered_turn_challenge_completes_after_dwell() (+12 more)
+
+### Community 27 - "Rate Limit.Py"
 Cohesion: 0.08
 Nodes (23): Add a domain to the blocklist, Add a new spider, Architecture, code:block1 (crawler/), code:block2 ([Scheduler]), code:python (from crawler.spiders.base import BaseSpider), code:python (@dataclass), code:block5 (PROXY_PROVIDER=brightdata        # brightdata | smartproxy |) (+15 more)
 
-### Community 16 - "Webcam.Js"
+### Community 28 - "Request Logging Middleware"
 Cohesion: 0.11
 Nodes (14): ApiKey, SQLModel: api_keys — programmatic access tokens., AuditLog, SQLModel: audit_log — append-only audit trail.  Row-level retention guarantees e, Cluster, SQLModel: clusters — face cluster metadata., SQLModel: takedowns — takedown requests + status., Takedown (+6 more)
 
-### Community 17 - "Auth.Py"
+### Community 29 - "Notifications.Py"
+Cohesion: 0.17
+Nodes (11): LivenessResult, _average_eye_aspect_ratio(), _failed(), MediaPipeActiveLivenessChecker, test_check_accepts_composite_string_challenge_before_model_lookup(), test_check_accepts_string_challenge_before_model_lookup(), test_check_rejects_unknown_string_challenge_before_decoding(), test_timestamp_offset_for_next_video_advances_between_requests() (+3 more)
+
+### Community 30 - "Estimate Head Pose()"
+Cohesion: 0.16
+Nodes (11): CameraCaptureError, CameraEvidenceWorker, Small headless camera worker that forwards frames to an evidence builder., Raised when a camera cannot be opened or stops producing frames., Own OpenCV capture and emit one shared evidence record per frame.      The proce, _Capture, test_camera_worker_forwards_frames_as_evidence_and_releases_capture(), test_camera_worker_rejects_negative_retention_without_opening_camera() (+3 more)
+
+### Community 31 - "Facemesh.Py"
+Cohesion: 0.11
+Nodes (19): _challenge_yaw(), _matrix_pose_from_result(), Map raw camera yaw to the physical direction used by challenge text., Map raw camera yaw to the physical direction used by challenge text., Map raw camera yaw to the physical direction used by challenge text., Return one valid MediaPipe pose or raise a fail-closed pose error., Return one valid MediaPipe pose or raise a fail-closed pose error., Return one valid MediaPipe pose or raise a fail-closed pose error. (+11 more)
+
+### Community 32 - "Session.Py"
 Cohesion: 0.18
 Nodes (16): embed_image(), EmbeddingResult, LivenessCheck, MLServiceError, MLServiceRejectedError, MLServiceUnavailableError, Small HTTP client helpers for the ML service., Call the ML embedding endpoint and normalize the wire response. (+8 more)
 
-### Community 18 - "Base Spider"
-Cohesion: 0.11
-Nodes (17): code:text (DATE — Phase N — STATUS), Current decision record, FaceAttend Local-First Migration Plan, Latest execution record, Phase 0 — Protect and characterize the existing project, Phase 1 — Define the headless package boundary, Phase 2 — Extract and validate the CV core, Phase 3 — Add local SQLite persistence (+9 more)
-
-### Community 19 - "Api.Py"
-Cohesion: 0.18
-Nodes (13): _axis_errors(), PoseValidationSample, PoseValidationSummary, Compare estimated head poses with controlled reference poses., One known-pose observation used for validation., Aggregate error and pass/fail results for a validation set., Summarize pose errors against controlled reference angles.      A sample passes, validate_pose_samples() (+5 more)
-
-### Community 20 - "Users.Py"
+### Community 33 - "Robots Check.Py"
 Cohesion: 0.14
-Nodes (11): log(), Append-only audit log writer. EVERY biometric op MUST call `log()`.  Schema (see, AttendanceRecordRow, SQLModel: attendance_records — liveness-gated attendance check-in results., check_in(), POST /v1/check-ins — check in by face with liveness first., delete_face_registration(), Face registration routes. (+3 more)
+Nodes (12): log(), Append-only audit log writer. EVERY biometric op MUST call `log()`.  Schema (see, AttendanceRecordRow, SQLModel: attendance_records — liveness-gated attendance check-in results., check_in(), POST /v1/check-ins — check in by face with liveness first., create_face_registration(), delete_face_registration() (+4 more)
 
-### Community 22 - "Test Face Pipeline.Py"
+### Community 34 - "Proxy Rotation.Py"
+Cohesion: 0.13
+Nodes (14): ChallengeResult, _matches_action(), _opposite(), _phase_for_action(), Calibration-aware, headless active-liveness challenge evaluation., Map randomized session actions to evaluator phases., Map randomized session actions to evaluator phases., Apply the configured neutral pose contract without advancing state. (+6 more)
+
+### Community 35 - "Dedup.Py"
+Cohesion: 0.16
+Nodes (13): AttendanceState, new_attendance_state_machine(), new_registration_state_machine(), Explicit states for local registration and attendance workflows., Raised when a workflow attempts an undefined transition., Small headless state machine shared by GUI and test workflows., RegistrationState, StateTransitionError (+5 more)
+
+### Community 37 - "Phash.Py"
+Cohesion: 0.13
+Nodes (16): Tuning knobs for blink-based active liveness., Raised when a liveness video cannot be decoded., Tuning knobs for blink-based active liveness., Raised when a liveness video cannot be decoded., Raised when a liveness video cannot be decoded., Raised when a liveness video cannot be decoded., Raised when a liveness video cannot be decoded., Return the mean MediaPipe smile blendshape score for one face. (+8 more)
+
+### Community 38 - "Queue Emit.Py"
+Cohesion: 0.2
+Nodes (7): test_session_generates_unique_auditable_sequence(), test_timestamps_must_be_strictly_increasing(), ChallengeSession, Generate and track one ordered, time-bounded challenge sequence.      CV evidenc, Generate and track one ordered, time-bounded challenge sequence.      CV evidenc, Generate and track one ordered, time-bounded challenge sequence.      CV evidenc, Generate and track one ordered, time-bounded challenge sequence.      CV evidenc
+
+### Community 39 - "Notifier.Py"
 Cohesion: 0.17
-Nodes (12): AttendanceState, new_attendance_state_machine(), new_registration_state_machine(), Explicit states for local registration and attendance workflows., Raised when a workflow attempts an undefined transition., Small headless state machine shared by GUI and test workflows., RegistrationState, StateTransitionError (+4 more)
+Nodes (11): _arguments(), _artifact(), _FixedChallengeSource, main(), _manifest(), Run one consented local liveness trial without retaining camera images.  Example, Preserve an explicitly requested diagnostic challenge sequence., Preserve an explicitly requested diagnostic challenge sequence. (+3 more)
 
-### Community 23 - "Threshold Calibration"
-Cohesion: 0.24
-Nodes (12): _face(), _frame(), Tests for the five-point face alignment adapter., test_align_rejects_invalid_frame(), test_align_rejects_nonfinite_landmarks(), test_align_rejects_wrong_landmark_shape(), test_align_returns_arcface_sized_bgr_image(), AlignmentError (+4 more)
+### Community 40 - "Match Diff.Py"
+Cohesion: 0.13
+Nodes (10): Observe the shared session before any evidence branch.          Returns False wh, Observe the shared session before any evidence branch.          Returns False wh, Observe the shared session before any evidence branch.          Returns False wh, Consume the active-liveness fields from one frame evidence record., Consume the active-liveness fields from one frame evidence record., Consume the active-liveness fields from one frame evidence record., Consume the active-liveness fields from one frame evidence record., Consume the active-liveness fields from one frame evidence record. (+2 more)
 
-### Community 24 - "Face Registrations.Py"
+### Community 41 - "Render Notice()"
+Cohesion: 0.13
+Nodes (14): Current decision record, Current decisions and boundaries, FaceAttend Local-First Migration Plan, How to track progress, Latest execution record, Phase 3 — SQLite, audit persistence, and exact local matching, Phase 4 — PySide6 shell and runtime concurrency, Phase 5 — Enrollment application workflow (+6 more)
+
+### Community 42 - "Exporter.Py"
 Cohesion: 0.19
 Nodes (7): MiniFASNet, MiniFASNet v2 wrapper — backs the passive liveness check., Convert [x1, y1, x2, y2] to [x, y, w, h]., Crop and resize face region from image., Preprocess face crop for inference., Apply softmax to logits., Predict if face is real or fake.          Args:             image: Input image (
 
-### Community 25 - "Example Spider"
-Cohesion: 0.2
-Nodes (12): _camera_matrix(), estimate_solvepnp_head_pose(), HeadPoseError, _landmark_xy(), Validated, framework-independent head-pose estimators.  The legacy ``ml.liveness, Estimate pose from six landmarks and a canonical 3D face model.      Angles are, Estimate pose from six landmarks and a canonical 3D face model.      Angles are, Estimate pose from six landmarks and a canonical 3D face model.      Angles are (+4 more)
+### Community 43 - "D4F6A8B2C9E1 Rename Biometric Tables"
+Cohesion: 0.16
+Nodes (12): MiniFASNetPassiveLivenessDetector, PassiveLivenessError, Evaluate one or more tracked faces using the existing MiniFASNet model.      A t, Evaluate one or more tracked faces using the existing MiniFASNet model.      A t, Evaluate one or more tracked faces using the existing MiniFASNet model.      A t, Raised when passive-liveness input or model output is invalid., Raised when passive-liveness input or model output is invalid., Raised when passive-liveness input or model output is invalid. (+4 more)
 
-### Community 26 - "Email Fallback"
-Cohesion: 0.22
-Nodes (11): _passing_video_summary(), _evenly_sample(), Helpers for sampling frames from short webcam videos., Raised when a check-in video cannot be sampled., sample_video_frames_as_jpegs(), VideoFrameDecodeError, create_face_registration(), analyze_video_passive_liveness() (+3 more)
+### Community 44 - "E7A4D91F2B63 Create Attendance Sessions.Py"
+Cohesion: 0.18
+Nodes (7): FakeScalarResult, _passing_video_summary(), RecordingIndex, test_check_in_ignores_low_confidence_match(), test_check_in_persists_best_match_across_live_frame_embeddings(), Match, VideoLivenessSummary
 
-### Community 27 - "Rate Limit.Py"
+### Community 45 - "Get Current User()"
+Cohesion: 0.18
+Nodes (8): _decode_video(), _eye_aspect_ratio(), _frame_timestamp_ms(), _landmark_xy(), MediaPipe-backed active liveness checks., result(), test_decode_video_empty_bytes_raises_video_decode_error(), test_frame_timestamp_ms_clamps_duplicate_metadata_timestamps()
+
+### Community 46 - "Attendance Records.Py"
+Cohesion: 0.18
+Nodes (9): ChallengeSessionSnapshot, ChallengeSessionStatus, RandomSource, Short-lived randomized active-liveness challenge sessions., Auditable public state of a challenge session., Auditable public state of a challenge session., Auditable public state of a challenge session., Auditable public state of a challenge session. (+1 more)
+
+### Community 47 - "Legacy Source Level Takedown"
+Cohesion: 0.17
+Nodes (12): main(), _print_comparison(), Print MediaPipe-matrix versus calibrated solvePnP pose per webcam frame.  Run fr, compare_pose_estimators(), PoseComparison, Compare MediaPipe's matrix pose with calibrated landmark ``solvePnP``., Compare MediaPipe's matrix pose with calibrated landmark ``solvePnP``., Compare MediaPipe's matrix pose with calibrated landmark ``solvePnP``. (+4 more)
+
+### Community 48 - "Main.Py"
 Cohesion: 0.15
 Nodes (12): Check-In Recommendation, code:text (Qt main thread: views, overlays, workflow presentation), Conclusion, Evaluation Gates, Migration Sequence, Passive PAD, Persistence and Privacy, Python Desktop CV Migration Feasibility (+4 more)
 
-### Community 28 - "Request Logging Middleware"
-Cohesion: 0.17
-Nodes (12): Legacy Crawl Override Log, Crawler Image Download, ImageItem, Crawler Inference Queue, Crawler S3 or MinIO Storage, Crawler Perceptual-Hash Deduplication, Crawler Politeness Policy, PostgreSQL pHash State (+4 more)
+### Community 49 - "Billing.Py"
+Cohesion: 0.23
+Nodes (9): _camera_matrix(), estimate_solvepnp_head_pose(), _landmark_xy(), Validated, framework-independent head-pose estimators.  The legacy ``ml.liveness, Estimate pose from six landmarks and a canonical 3D face model.      Angles are, Estimate pose from six landmarks and a canonical 3D face model.      Angles are, Estimate pose from six landmarks and a canonical 3D face model.      Angles are, Estimate pose from six landmarks and a canonical 3D face model.      Angles are (+1 more)
 
-### Community 29 - "Notifications.Py"
-Cohesion: 0.22
-Nodes (7): FakeScalarResult, AttendanceSessionRow, SQLModel: attendance_sessions — explicit sessions users can check into., create_attendance_session(), list_attendance_sessions(), Attendance session routes., _serialize_session()
-
-### Community 30 - "Estimate Head Pose()"
+### Community 50 - "Priority.Py"
 Cohesion: 0.18
-Nodes (7): test_pose_hysteresis_has_separate_enter_and_exit_thresholds(), ValueError, PoseHysteresis, Prevent pose-bin flicker with distinct enter and exit thresholds., Prevent pose-bin flicker with distinct enter and exit thresholds., Prevent pose-bin flicker with distinct enter and exit thresholds., Prevent pose-bin flicker with distinct enter and exit thresholds.
+Nodes (9): mediapipe_smile_score(), Return the mean MediaPipe smile blendshape score for one face., Return at most one action event for the current MediaPipe result., Return at most one action event for the current MediaPipe result., Return at most one action event for the current MediaPipe result., Return at most one action event for the current MediaPipe result., Return at most one action event for the current MediaPipe result., Return at most one action event for the current MediaPipe result. (+1 more)
 
-### Community 31 - "Facemesh.Py"
+### Community 51 - "Recrawl.Py"
+Cohesion: 0.35
+Nodes (9): _face(), _frame(), test_continuity_accepts_same_face_and_short_gap(), test_continuity_does_not_infer_absence_between_valid_observations(), test_continuity_fails_face_substitution_or_multiple_faces(), test_continuity_fails_long_gap_jump_and_non_monotonic_time(), FaceContinuityConfig, FaceContinuityTracker (+1 more)
+
+### Community 52 - "Recrawl Scheduler.Py"
+Cohesion: 0.18
+Nodes (10): code:bash (PYTHONPATH=src uv run python scripts/run_liveness_trial.py \), code:bash (PYTHONPATH=src uv run python scripts/run_liveness_trial.py \), Decision metrics, Experimental LOOK_UP and SMILE validation, Local liveness trial protocol, Minimum development matrix, Purpose, Retention and consent (+2 more)
+
+### Community 53 - "Tracker.Py"
+Cohesion: 0.18
+Nodes (11): Phase 0 — Protect and characterize the existing project, Phase 1 — Define the headless package boundary, Phase 2 — Extract and validate the CV core, Phase 3 — Add local SQLite persistence, Phase 4 — Build the PySide6 application shell, Phase 5 — Implement enrollment, Phase 6 — Implement attendance check-in, Phase 7 — Build reproducible evaluation (+3 more)
+
+### Community 54 - "Session.Py"
 Cohesion: 0.24
 Nodes (4): _backend_detail(), check_in_page(), create_check_in(), /attendance — attendance result dashboard + detail.
 
-### Community 32 - "Session.Py"
+### Community 56 - "Rbac.Py"
 Cohesion: 0.29
 Nodes (6): createBlinkState(), createLivenessGuidance(), getFaceLandmarker(), setResult(), startLivenessCapture(), USER_CAMERA_CONSTRAINTS
 
-### Community 34 - "Proxy Rotation.Py"
+### Community 57 - "Billing.Py"
+Cohesion: 0.31
+Nodes (9): _projected_landmarks(), Deterministic validation for the new headless pose boundary., test_invalid_pose_inputs_raise_head_pose_error(), test_lazy_model_factory_runs_once(), test_matrix_and_solvepnp_agree_on_controlled_pose(), test_mediapipe_matrix_estimator_handles_turns_and_pitch(), test_pose_comparison_rejects_invalid_matrix_or_landmarks(), test_pose_estimator_protocol_adapter_uses_frame_dimensions() (+1 more)
+
+### Community 58 - "Reembed.Py"
+Cohesion: 0.2
+Nodes (8): test_pose_smoother_changes_rendered_value_but_not_raw_pose(), ExponentialPoseSmoother, Smooth rendered/decision pose values without changing raw evidence., Smooth rendered/decision pose values without changing raw evidence., Smooth rendered/decision pose values without changing raw evidence., Smooth rendered/decision pose values without changing raw evidence., Smooth rendered/decision pose values without changing raw evidence., Smooth rendered/decision pose values without changing raw evidence.
+
+### Community 59 - "Purge Domain.Py"
 Cohesion: 0.2
 Nodes (9): Baseline Evidence, Characterization Coverage, Headless Boundary Added, Local-First Desktop Migration Progress, Next Gate, Outcome, Phase 0 and Initial Phase 1 Slice — 2026-09-04, Preserved Dirty State (+1 more)
 
-### Community 35 - "Dedup.Py"
+### Community 60 - "Cluster Eval.Py"
 Cohesion: 0.2
 Nodes (9): ADR-001: Local-First Desktop CV Architecture, Assumptions Requiring Reconsideration, Consequences, Context, Decision, Decision Gates, Options Considered, Proposed Decision (+1 more)
 
-### Community 36 - "Image Download.Py"
+### Community 61 - "Calibrate Liveness.Py"
 Cohesion: 0.27
 Nodes (10): Append-Only Biometric Audit Log, Biometric Data Minimization, Versioned 512-Dimensional Face Embedding, Embedding Model Version Display, Embedding Model Versioning, Face Registration Flow, Face Registration Success State, PostgreSQL Attendance Domain Tables (+2 more)
 
-### Community 37 - "Phash.Py"
+### Community 62 - "Face Attend"
 Cohesion: 0.28
 Nodes (4): login(), Public site auth routes — /login, /register, /verify., _redirect_with_session_token(), register()
 
-### Community 38 - "Queue Emit.Py"
+### Community 63 - "Settings.Py"
+Cohesion: 0.22
+Nodes (7): test_pose_hysteresis_has_separate_enter_and_exit_thresholds(), PoseHysteresis, Prevent pose-bin flicker with distinct enter and exit thresholds., Prevent pose-bin flicker with distinct enter and exit thresholds., Prevent pose-bin flicker with distinct enter and exit thresholds., Prevent pose-bin flicker with distinct enter and exit thresholds., Prevent pose-bin flicker with distinct enter and exit thresholds.
+
+### Community 64 - "Architecture Decision Record Template"
+Cohesion: 0.22
+Nodes (6): MediaPipeFrameLandmarker, Close native MediaPipe resources; no camera ownership or persistence., Close native MediaPipe resources; no camera ownership or persistence., Close native MediaPipe resources; no camera ownership or persistence., Synchronous VIDEO-mode matrix/action adapter; one instance per capture stream., Synchronous VIDEO-mode matrix/action adapter; one instance per capture stream.
+
+### Community 65 - "Insight Face Buffalo L"
+Cohesion: 0.22
+Nodes (8): Camera-worker seam, code:python (from pathlib import Path), code:python (from faceattend.camera.worker import CameraEvidenceWorker), Evidence and safety boundaries, Public API, Selecting model files, Using the headless face processor, Verification on 2026-09-06
+
+### Community 66 - "Silent Face Anti Spoofing"
 Cohesion: 0.22
 Nodes (9): API Key Authentication, Backend Services, FastAPI Backend API, OAuth2 and JWT Authentication, FastAPI-Generated OpenAPI Documentation, Backend Unavailable State, Pydantic v2 API Schemas, Redis-Backed Rate Limiting (+1 more)
 
-### Community 39 - "Notifier.Py"
+### Community 67 - "Iso Iec 30107 3"
 Cohesion: 0.33
 Nodes (9): ArcFace R100 Embedding, Current Enrollment and Search Pipeline, Deepfake Liveness Check, Five-Point Face Alignment, FAR and FRR Liveness Calibration, MediaPipe Active Liveness, MiniFASNet v2 Passive Liveness, ML Model Benchmark Gate (+1 more)
 
-### Community 40 - "Match Diff.Py"
-Cohesion: 0.25
-Nodes (9): Legacy Re-Crawl Priorities, Crawler Scheduler, Cross-Component Integration Tests, Legacy Crawler Ingest Pipeline, Legacy Public-Image Crawler Scope, Legacy Face Identity Clustering, Legacy ML Crawler Ingest Pipeline, Legacy Perceptual Image Hashing (+1 more)
-
-### Community 41 - "Render Notice()"
+### Community 68 - "Gdpr Article 9"
 Cohesion: 0.25
 Nodes (5): ImageItem, ImageItem — emitted by spiders, processed by pipelines, queued to inference., BaseSpider, BaseSpider — shared behavior for all FaceAttend spiders., Subclass and override `name`, `allowed_domains`, `start_urls`, `parse`.
 
-### Community 42 - "Exporter.Py"
+### Community 69 - "Init .Py"
+Cohesion: 0.32
+Nodes (6): AttendanceSessionRow, SQLModel: attendance_sessions — explicit sessions users can check into., create_attendance_session(), list_attendance_sessions(), Attendance session routes., _serialize_session()
+
+### Community 70 - "Init .Py"
 Cohesion: 0.25
-Nodes (8): compare_pose_estimators(), PoseComparison, Compare MediaPipe's matrix pose with calibrated landmark ``solvePnP``., Compare MediaPipe's matrix pose with calibrated landmark ``solvePnP``., Compare MediaPipe's matrix pose with calibrated landmark ``solvePnP``., Side-by-side pose estimates used for validation diagnostics., Side-by-side pose estimates used for validation diagnostics., Side-by-side pose estimates used for validation diagnostics.
+Nodes (7): CanonicalSolvePnPHeadPoseEstimator, Headless adapter implementing the project's pose-estimator protocol., Headless adapter implementing the project's pose-estimator protocol., Headless adapter implementing the project's pose-estimator protocol., Headless adapter for MediaPipe facial transformation matrices., Headless adapter implementing the project's pose-estimator protocol., Headless adapter implementing the project's pose-estimator protocol.
 
-### Community 43 - "D4F6A8B2C9E1 Rename Biometric Tables"
-Cohesion: 0.43
-Nodes (7): _projected_landmarks(), Deterministic validation for the new headless pose boundary., test_invalid_pose_inputs_raise_head_pose_error(), test_matrix_and_solvepnp_agree_on_controlled_pose(), test_pose_comparison_rejects_invalid_matrix_or_landmarks(), test_pose_estimator_protocol_adapter_uses_frame_dimensions(), test_solvepnp_recovers_known_pose()
+### Community 71 - "Init .Py"
+Cohesion: 0.25
+Nodes (7): test_matrix_estimator_uses_degrees_without_arbitrary_scaling(), estimate_matrix_head_pose(), Extract the same degree/sign convention from a 4x4 face transform., Extract the same degree/sign convention from a 4x4 face transform., Extract the same degree/sign convention from a 4x4 face transform., Extract the same degree/sign convention from a 4x4 face transform., Extract the same degree/sign convention from a 4x4 face transform.
 
-### Community 44 - "E7A4D91F2B63 Create Attendance Sessions.Py"
+### Community 72 - "Init .Py"
 Cohesion: 0.25
 Nodes (8): Current Attendance API Scope, Liveness Before Registration and Check-In, Attendance Record Not Found State, Attendance Results Error State, Check-In Error Alert, Categorized Flash Messages, Liveness Failure Guidance, Attendance Login Requirement
 
-### Community 45 - "Get Current User()"
-Cohesion: 0.29
-Nodes (6): test_pose_smoother_changes_rendered_value_but_not_raw_pose(), ExponentialPoseSmoother, Smooth rendered/decision pose values without changing raw evidence., Smooth rendered/decision pose values without changing raw evidence., Smooth rendered/decision pose values without changing raw evidence., Smooth rendered/decision pose values without changing raw evidence.
+### Community 73 - "Init .Py"
+Cohesion: 0.43
+Nodes (6): _embedder(), Tests for the injectable InsightFace recognition adapter., test_embedder_loads_model_once(), test_embedder_normalizes_recognition_output_and_exposes_metadata(), test_embedder_rejects_invalid_aligned_image(), test_embedder_rejects_zero_or_nonfinite_output()
 
-### Community 46 - "Attendance Records.Py"
+### Community 74 - "Init .Py"
 Cohesion: 0.29
-Nodes (5): CanonicalSolvePnPHeadPoseEstimator, Headless adapter implementing the project's pose-estimator protocol., Headless adapter implementing the project's pose-estimator protocol., Headless adapter implementing the project's pose-estimator protocol., Headless adapter implementing the project's pose-estimator protocol.
+Nodes (7): Active challenge evaluation, Challenge session design, Explicitly rejected for the first version, Frame-evidence boundary, Headless tests and real-camera validation, Passive PAD and matching order, Randomized active-liveness plan
 
-### Community 47 - "Legacy Source Level Takedown"
+### Community 75 - "Init .Py"
+Cohesion: 0.38
+Nodes (7): 2026-09-06 — Phase 2A — Headless processor and model boundary completed, 2026-09-06 — Phase 2B — Evaluator/session lifecycle completed, 2026-09-06 — Phase 2C — Guarded evidence and measured quality implemented, 2026-09-07 — Phase 2D–2F — Edge cases, PAD lifecycle, and trial harness, code:text (DATE — Phase N/subsection — STATUS), Execution-record template, Update template
+
+### Community 76 - "Init .Py"
 Cohesion: 0.29
-Nodes (7): test_matrix_estimator_uses_degrees_without_arbitrary_scaling(), estimate_matrix_head_pose(), Extract the same degree/sign convention from a 4x4 face transform., Extract the same degree/sign convention from a 4x4 face transform., Extract the same degree/sign convention from a 4x4 face transform., Extract the same degree/sign convention from a 4x4 face transform., _rotation_to_pose()
+Nodes (7): 2A — Model adapters and pose foundations, 2B — Randomized challenge session, 2C — Frame-evidence boundary and continuity, 2D — Active challenge evidence and evaluation, 2E — Temporal passive PAD and liveness ordering, 2F — Headless camera connection and completion gate, Phase 2 — Extract and integrate the headless CV core
 
-### Community 48 - "Main.Py"
+### Community 77 - "Init .Py"
 Cohesion: 0.29
 Nodes (6): ADR-NNN: <Title>, Consequences, Context, Decision, Options Considered, References
 
-### Community 50 - "Priority.Py"
+### Community 78 - "Init .Py"
+Cohesion: 0.29
+Nodes (7): Legacy Crawl Override Log, Crawler Politeness Policy, Crawler Proxy Pool, Legacy Re-Crawl Priorities, robots.txt Compliance, Crawler Scheduler, Crawler Spider Pool
+
+### Community 79 - "Init .Py"
+Cohesion: 0.29
+Nodes (7): Crawler Image Download, ImageItem, Crawler Inference Queue, Crawler S3 or MinIO Storage, Crawler Perceptual-Hash Deduplication, PostgreSQL pHash State, Crawler Redis State
+
+### Community 80 - "Init .Py"
+Cohesion: 0.33
+Nodes (7): Cross-Component Integration Tests, Legacy Crawler Ingest Pipeline, Legacy Public-Image Crawler Scope, Legacy Face Identity Clustering, Legacy ML Crawler Ingest Pipeline, Legacy Perceptual Image Hashing, FaceAttend ML Inference System
+
+### Community 82 - "Init .Py"
 Cohesion: 0.33
 Nodes (5): hamming(), phash(), Perceptual hash (DCT-based pHash)., Hamming distance between two pHash hex strings., Return a hex string suitable for storage + Hamming-distance comparison.
 
-### Community 51 - "Recrawl.Py"
+### Community 83 - "Init .Py"
+Cohesion: 0.47
+Nodes (4): _area(), _center(), ContinuityResult, Fail-closed temporal continuity checks for active-liveness sequences.
+
+### Community 84 - "Init .Py"
+Cohesion: 0.33
+Nodes (5): Evidence and next experiments, Frame quality and session policy, Implemented policy, Reference review, Runtime connection
+
+### Community 85 - "Init .Py"
 Cohesion: 0.33
 Nodes (6): CelebA-Spoof, GAC-FAS, NIST Demographic Effects, OULU-NPU, Replay-Attack, Threshold Calibration
 
-### Community 54 - "Session.Py"
+### Community 88 - "Init .Py"
 Cohesion: 0.4
 Nodes (3): BaseSpider, ExampleSpider, Example spider — copy this file to add a new source.
 
-### Community 55 - "Main.Py"
+### Community 89 - "Init .Py"
+Cohesion: 0.6
+Nodes (4): _frame(), Tests for the injectable InsightFace detector adapter., test_detector_accepts_missing_landmarks_for_later_quality_rejection(), test_detector_loads_model_once_and_maps_face_fields()
+
+### Community 90 - "Init .Py"
 Cohesion: 0.4
 Nodes (3): EmailFallback, Manual email fallback used until per-platform API integrations exist., TakedownPlatform
 
-### Community 56 - "Rbac.Py"
+### Community 91 - "Init .Py"
 Cohesion: 0.4
 Nodes (3): Per-platform takedown integration interface., Submit the notice; return the platform's reference id + status., TakedownPlatform
 
-### Community 57 - "Billing.Py"
-Cohesion: 0.4
-Nodes (4): Run migrations in 'offline' mode.      This configures the context with just a U, Run migrations in 'online' mode.      In this scenario we need to create an Engi, run_migrations_offline(), run_migrations_online()
-
-### Community 58 - "Reembed.Py"
+### Community 92 - "Init .Py"
 Cohesion: 0.4
 Nodes (3): BaseHTTPMiddleware, Structured request logging (never log PII or biometric blobs)., RequestLoggingMiddleware
 
-### Community 60 - "Cluster Eval.Py"
-Cohesion: 0.6
-Nodes (4): _draw_blink_scores(), _draw_face_landmarks(), main(), Preview MediaPipe Face Landmarker output from the webcam.
+### Community 94 - "Init .Py"
+Cohesion: 0.4
+Nodes (4): Run migrations in 'offline' mode.      This configures the context with just a U, Run migrations in 'online' mode.      In this scenario we need to create an Engi, run_migrations_offline(), run_migrations_online()
 
-### Community 69 - "Init .Py"
+### Community 95 - "Init .Py"
+Cohesion: 0.5
+Nodes (4): estimate_head_pose(), HeadPose, Head-pose helpers for MediaPipe face landmarks., Estimate pitch/yaw/roll from MediaPipe landmarks with solvePnP.
+
+### Community 104 - "Community 104"
 Cohesion: 0.5
 Nodes (3): find_new_matches_for(), Find new matches for enrolled users since the last monitoring pass., Return matches discovered since the user's last_notified_at watermark.
 
-### Community 70 - "Init .Py"
+### Community 105 - "Community 105"
 Cohesion: 0.5
 Nodes (3): Generate DMCA / GDPR / platform takedown notices from templates., Render the body of a takedown notice for the given match + notice type., render_notice()
 
-### Community 71 - "Init .Py"
+### Community 106 - "Community 106"
 Cohesion: 0.5
 Nodes (3): export_user_data(), GDPR data export — return every record we hold about a user., Return all PII + embeddings + audit entries for the user as a dict.
 
-### Community 74 - "Init .Py"
+### Community 109 - "Community 109"
 Cohesion: 0.5
 Nodes (3): get_current_user(), Shared FastAPI dependencies (current user, DB session, etc.)., Resolve the current user from the Authorization: Bearer <jwt> header.
 
-### Community 76 - "Init .Py"
-Cohesion: 0.67
-Nodes (3): main(), _print_comparison(), Print MediaPipe-matrix versus calibrated solvePnP pose per webcam frame.  Run fr
+### Community 112 - "Community 112"
+Cohesion: 0.5
+Nodes (4): 2026-09-07 — Phase 2E — Dedicated neutral PAD window, 2026-09-07 — Phase 2F — First staged real-camera smoke, 2026-09-07 — Phase 2F — Successful staged real-camera smoke, Reconciliation record — 2026-09-06
 
-### Community 77 - "Init .Py"
+### Community 113 - "Community 113"
+Cohesion: 0.5
+Nodes (3): Answer, Q: What did Phase 2B evaluator session lifecycle complete?, Source Nodes
+
+### Community 114 - "Community 114"
+Cohesion: 0.5
+Nodes (3): Answer, Q: What did Phase 2A headless face composition complete on 2026-09-06?, Source Nodes
+
+### Community 115 - "Community 115"
+Cohesion: 0.5
+Nodes (3): Answer, Q: What did Phase 2C implement for evidence continuity quality and terminal PAD policy on 2026-09-06?, Source Nodes
+
+### Community 116 - "Community 116"
 Cohesion: 0.5
 Nodes (3): Answer, Q: What was completed in the first local-first migration slice?, Source Nodes
 
-### Community 78 - "Init .Py"
+### Community 117 - "Community 117"
 Cohesion: 0.5
 Nodes (3): Answer, Q: What has Phase 2 completed so far?, Source Nodes
 
-### Community 79 - "Init .Py"
+### Community 118 - "Community 118"
+Cohesion: 0.5
+Nodes (3): Answer, Q: What happened in the first LOOK_UP camera validation trial?, Source Nodes
+
+### Community 119 - "Community 119"
+Cohesion: 0.5
+Nodes (3): Answer, Q: How does the reconciled migration plan map randomized liveness to numbered phases as of 2026-09-06?, Source Nodes
+
+### Community 120 - "Community 120"
+Cohesion: 0.5
+Nodes (3): Answer, Q: Should LOOK_UP and SMILE be enabled in the default FaceAttend challenge pool after proposal trials?, Source Nodes
+
+### Community 121 - "Community 121"
 Cohesion: 0.5
 Nodes (3): Answer, Q: What is the audited current state of FaceAttend?, Source Nodes
 
-### Community 80 - "Init .Py"
+### Community 122 - "Community 122"
 Cohesion: 0.5
 Nodes (3): Answer, Q: Should FaceAttend migrate to a local Python CV application?, Source Nodes
 
-### Community 81 - "Init .Py"
+### Community 123 - "Community 123"
 Cohesion: 0.5
-Nodes (4): Ray Serve Model Deployments, Ray Serve Inference Serving, Triton Model Repository Layout, Triton Inference Serving
+Nodes (3): Answer, Q: What did the 2026-09-07 Phase 2 liveness hardening complete?, Source Nodes
 
-### Community 82 - "Init .Py"
+### Community 124 - "Community 124"
 Cohesion: 0.67
 Nodes (4): Legacy Blocklist Decision Log, Legacy Source-Level Takedown Handling, Legacy Crawler Domain Blocklist, Legacy Backend Takedown Workflow
 
-### Community 99 - "Min Io"
+### Community 125 - "Community 125"
+Cohesion: 0.5
+Nodes (4): Ray Serve Model Deployments, Ray Serve Inference Serving, Triton Model Repository Layout, Triton Inference Serving
+
+### Community 143 - "Community 143"
 Cohesion: 0.67
 Nodes (3): Explicit Self Check-In, Legacy Crawler Search and Takedown Scope, FaceAttend
 
 ## Knowledge Gaps
-- **416 isolated node(s):** `Public site (port 8000) — end-user-facing FastAPI + Jinja2 + HTMX app.`, `Public site auth routes — /login, /register, /verify.`, `/billing — Stripe-backed plan management.`, `/attendance — attendance result dashboard + detail.`, `/face-registration — register a consenting face for attendance.` (+411 more)
+- **688 isolated node(s):** `Public site (port 8000) — end-user-facing FastAPI + Jinja2 + HTMX app.`, `Public site auth routes — /login, /register, /verify.`, `/billing — Stripe-backed plan management.`, `/attendance — attendance result dashboard + detail.`, `/face-registration — register a consenting face for attendance.` (+683 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **54 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **57 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `VideoFrameDecodeError` connect `Email Fallback` to `Estimate Head Pose()`?**
-  _High betweenness centrality (0.058) - this node is a cross-community bridge._
-- **Why does `HeadPoseError` connect `Example Spider` to `Media Pipe Active Liveness`, `Fake Session`, `Estimate Head Pose()`, `Legacy Source Level Takedown`?**
-  _High betweenness centrality (0.042) - this node is a cross-community bridge._
-- **Why does `VideoLivenessSummary` connect `Email Fallback` to `Sqlmodel`, `Auth.Py`, `Notifications.Py`?**
-  _High betweenness centrality (0.035) - this node is a cross-community bridge._
-- **Are the 33 inferred relationships involving `Frame` (e.g. with `FaceDetector` and `FaceAligner`) actually correct?**
-  _`Frame` has 33 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 29 inferred relationships involving `FaceObservation` (e.g. with `FaceDetector` and `FaceAligner`) actually correct?**
-  _`FaceObservation` has 29 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 8 inferred relationships involving `FakeSession` (e.g. with `EmbeddingResult` and `LivenessCheck`) actually correct?**
-  _`FakeSession` has 8 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 13 inferred relationships involving `MediaPipeActiveLivenessChecker` (e.g. with `HeadPoseError` and `LivenessResult`) actually correct?**
-  _`MediaPipeActiveLivenessChecker` has 13 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `FakeScalarResult` connect `E7A4D91F2B63 Create Attendance Sessions.Py` to `Session.Py`, `Robots Check.Py`, `Init .Py`, `Auth.Py`, `Api.Py`, `Request Logging Middleware`?**
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
+- **Why does `ActiveLivenessChallengeEvaluator` connect `Email Fallback` to `Fake Session`, `Proxy Rotation.Py`, `Phash.Py`, `Mini Fasnet.Py`, `Liveness Gated Check In`, `Match Diff.Py`, `Notifier.Py`, `Queue Emit.Py`, `Attendance Records.Py`, `Ml Test Fixtures. Only`, `Base Spider`, `Example Spider`, `Notifications.Py`?**
+  _High betweenness centrality (0.038) - this node is a cross-community bridge._
+- **Why does `Frame` connect `Attendance.Py` to `Media Pipe Active Liveness`, `Fake Session`, `Faissstore`, `Liveness Gated Check In`, `Mini Fasnet.Py`, `Base Model`, `Ml Test Fixtures. Only`, `Webcam.Js`, `Base Spider`, `Api.Py`, `Threshold Calibration`, `Example Spider`, `Notifications.Py`, `Estimate Head Pose()`, `Phash.Py`, `Notifier.Py`, `D4F6A8B2C9E1 Rename Biometric Tables`, `Legacy Source Level Takedown`, `Recrawl.Py`, `Billing.Py`, `Reembed.Py`, `Settings.Py`, `Architecture Decision Record Template`, `Init .Py`, `Init .Py`, `Init .Py`?**
+  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+- **Are the 81 inferred relationships involving `Frame` (e.g. with `PAD` and `_FixedSequenceRandom`) actually correct?**
+  _`Frame` has 81 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 50 inferred relationships involving `ActiveLivenessChallengeEvaluator` (e.g. with `PAD` and `_FixedSequenceRandom`) actually correct?**
+  _`ActiveLivenessChallengeEvaluator` has 50 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 57 inferred relationships involving `FaceObservation` (e.g. with `PAD` and `_FixedSequenceRandom`) actually correct?**
+  _`FaceObservation` has 57 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 39 inferred relationships involving `TemporalPassiveLivenessSession` (e.g. with `PAD` and `ActiveLivenessConfig`) actually correct?**
+  _`TemporalPassiveLivenessSession` has 39 INFERRED edges - model-reasoned connections that need verification._

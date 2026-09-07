@@ -91,6 +91,8 @@ data/
 datasets/
 raw/
 processed/
+local-biometric-recordings/
+pad-trials/
 *.npy
 *.npz
 *.parquet
@@ -162,6 +164,11 @@ desktop.ini
 *.tmp
 tmp/
 scratch/
+
+# Local biometric calibration/evaluation output (never commit by default)
+/pose.csv
+/roll_left.csv
+/roll_right.csv
 
 
 # Keep Graphify's reproducible map and durable decision memory in Git, while
