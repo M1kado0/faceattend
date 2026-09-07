@@ -2,8 +2,8 @@
 
 **Last reconciled:** 2026-09-07
 
-**Current phase:** Phase 3 — ready for SQLite, audit persistence, and local matching
-**Overall status:** PHASE 2 COMPLETED; PHASE 3 PENDING
+**Current phase:** Phase 4 — PySide6 shell and runtime concurrency
+**Overall status:** PHASE 3 COMPLETED; PHASE 4 READY
 
 Target: PySide6 desktop UI + headless Python CV/application core + SQLite +
 reproducible evaluation. Preserve the web implementation until verified parity
@@ -21,7 +21,7 @@ claims. Where those claims conflict with this checklist, use this checklist.
   A tested helper is not automatically an integrated or camera-validated feature.
 - `[ ]`: remaining work, including partial implementations needing integration.
 - `COMPLETED`: the stated phase scope passed its gate.
-- `IN_PROGRESS`: active implementation; Phase 2 is the current workstream.
+- `IN_PROGRESS`: active implementation in the current workstream.
 - `PENDING`: later phase not yet entered; early reusable pieces may already exist.
 - `BLOCKED`: identify the exact missing permission, data, or decision.
 - `DEFERRED`: intentionally outside the current implementation.
@@ -38,7 +38,7 @@ experiment or a passing synthetic test into measured security effectiveness.
 | 0 | Protect existing work and establish baselines | COMPLETED — historical baseline |
 | 1 | Headless types, protocols, and workflow-state foundation | COMPLETED — foundation only |
 | 2 | CV adapters, frame evidence, randomized sessions, headless runtime | COMPLETED |
-| 3 | SQLite, audit persistence, exact local matcher | PENDING |
+| 3 | SQLite, audit persistence, exact local matcher | COMPLETED |
 | 4 | Qt shell, camera/inference concurrency, session presentation | PENDING |
 | 5 | Enrollment using the shared liveness runtime | PENDING |
 | 6 | Attendance using the shared liveness runtime and matcher | PENDING |
@@ -316,21 +316,106 @@ calibration, population evidence, or a security benchmark.
 
 ## Phase 3 — SQLite, audit persistence, and exact local matching
 
-**Status: PENDING**
+**Status: COMPLETED**
 
-- [ ] Add migrations, foreign keys, transactions, and appropriate concurrency/WAL.
-- [ ] Add people, consent, enrollment/templates, attendance sessions/records,
+- [x] Add migrations, foreign keys, transactions, and appropriate concurrency/WAL.
+- [x] Add people, consent, enrollment/templates, attendance sessions/records,
       liveness attempts, model/configuration versions, and audit records.
-- [ ] Persist challenge sequence, outcomes, failure reasons, and configuration
+- [x] Persist challenge sequence, outcomes, failure reasons, and configuration
       version in audit records; do not store raw biometric payloads in logs.
-- [ ] Store normalized float32 embedding BLOBs with dimensions/model/checksum/
+- [x] Store normalized float32 embedding BLOBs with dimensions/model/checksum/
       quality/pose metadata; implement reload and compatibility filtering.
-- [ ] Implement exact NumPy person-level matching, threshold and ambiguity policy,
+- [x] Implement exact NumPy person-level matching, threshold and ambiguity policy,
       with a replaceable search interface; FAISS only for measured need.
-- [ ] Test deletion, erasure of templates, uniqueness/idempotency, restart,
+- [x] Test deletion, erasure of templates, uniqueness/idempotency, restart,
       rollback, unknown identities, and ambiguous matches.
-- [ ] Define safe migration of existing PostgreSQL/FAISS metadata without deleting
+- [x] Define safe migration of existing PostgreSQL/FAISS metadata without deleting
       or silently reinterpreting incompatible templates.
+
+Phase 3 starts with a synchronous standard-library SQLite boundary. Each operation
+opens its own configured connection, so GUI/camera/inference threads never share a
+default connection. File databases use WAL and a busy timeout; foreign keys are
+enabled on every connection; numbered SQL migrations and explicit rollback-tested
+transactions own schema changes. Higher-level repositories must use this boundary.
+
+### 2026-09-07 — Phase 3A — SQLite lifecycle foundation
+
+- Outcome: added the local persistence package, idempotent numbered migration
+  runner, per-operation connections, foreign-key enforcement, WAL, busy timeout,
+  and explicit commit/rollback transactions. Initial schema covers every planned
+  Phase 3 record category without storing raw face images.
+- Files: `src/faceattend/persistence/database.py`,
+  `src/faceattend/persistence/migrations/001_initial.sql`, package exports,
+  `tests/unit/test_database.py`, and this plan.
+- TDD evidence: the first public lifecycle test failed RED because the persistence
+  package did not exist; after implementation, both migration/PRAGMA and rollback
+  behavior passed GREEN. Final verification: **246 tests passed**, Ruff passed,
+  and `mypy src` passed for 25 source files.
+- Limitations: repositories, typed record models, embedding serialization,
+  append-only audit enforcement, biometric erasure, exact NumPy matching, and
+  PostgreSQL/FAISS migration are not implemented by this slice.
+- Next gate: add person/consent/enrollment repositories with atomic audit events,
+  then normalized float32 template serialization and compatibility filtering.
+
+### 2026-09-07 — Phase 3 — Local persistence and matching completed
+
+- Outcome: implemented transactional repositories for people, explicit consent,
+  enrollment with multiple templates, attendance sessions/records, liveness
+  attempts, versioned model/configuration metadata, and append-only audits.
+  New attendance writes require a linked check-in attempt where both active and
+  passive liveness passed.
+- Storage: templates are finite, L2-normalized contiguous float32 BLOBs with
+  dimensions, model name/version/checksum, pose bin, quality, and timestamps.
+  Reload filters by exact model identity and rejects corrupt stored metadata.
+- Matching: `ExactNumpyMatcher` implements the replaceable matcher protocol,
+  exact cosine search, person-level best-template aggregation, configurable
+  match threshold, and best-versus-second-person ambiguity rejection. FAISS is
+  not used by the local runtime.
+- Privacy/audit: challenge sequences, completed actions, active/passive outcomes,
+  failure reason, and configuration version are persisted without raw frames,
+  crops, or embedding vectors in audit metadata. Person erasure removes linked
+  templates atomically while preserving a non-biometric erasure audit event.
+- Migration: [the proposed safe PostgreSQL/FAISS migration](postgres-faiss-to-local-migration.md)
+  defines immutable export, identity/vector mapping, exact compatibility,
+  quarantine, dry-run, staged import, parity, cutover, and rollback. No source
+  data has been migrated, reinterpreted, or deleted.
+- Files: `src/faceattend/persistence/`, `src/faceattend/vision/matcher.py`,
+  matcher exports/protocol integration, three persistence migrations,
+  `tests/unit/test_database.py`, `tests/unit/test_repositories.py`,
+  `tests/unit/test_matcher.py`, the migration note, and this plan.
+- Tests/checks: focused persistence/matcher suite **8 passed**. Full
+  `UV_CACHE_DIR=/tmp/faceguard-uv-cache uv run pytest -q` **252 passed** with
+  seven dependency/deprecation warnings. Ruff passed; `mypy src` passed for
+  28 source files.
+- Evidence level: deterministic unit/integration tests against temporary SQLite
+  databases. No production migration, calibrated recognition threshold, or
+  population-scale matching benchmark has been performed.
+- Known limitations: erasure/retention policy, legacy consent eligibility, model
+  identity of old vectors, and import eligibility of old attendance remain user
+  or ADR decisions. Thresholds and ambiguity margins remain validation inputs,
+  not proven security settings.
+- Next gate: Phase 4 may compose these headless boundaries into PySide6 camera,
+  inference, persistence, and presentation workers without moving CV logic into
+  widgets.
+- Approval: required before importing legacy biometric metadata, choosing a
+  retention policy, promoting thresholds, or deleting PostgreSQL/FAISS sources.
+
+### 2026-09-07 — Phase 3 local persistence smoke
+
+- Outcome: added a runnable, non-biometric smoke command using three synthetic
+  normalized templates. It proves restart/reload, same-person matching, unknown
+  rejection, liveness-gated attendance, duplicate idempotency, template erasure,
+  and preservation of append-only audit history.
+- Command: `uv run python scripts/test_local_persistence.py`. By default it
+  creates a fresh SQLite file in a temporary directory and prints its path. An
+  explicit `--database NEW_PATH` is supported, but existing files are refused.
+- Privacy: the smoke uses synthetic basis vectors and no camera, face image, or
+  real embedding.
+- Tests/checks: dedicated smoke test **1 passed**; full suite **253 passed** with
+  seven dependency/deprecation warnings. Ruff passed; `mypy src` passed for 28
+  source files; the smoke script passed a separate strict mypy check.
+- Limitation: this validates persistence plumbing, not real-person recognition,
+  threshold calibration, PAD effectiveness, or legacy migration.
 
 ## Phase 4 — PySide6 shell and runtime concurrency
 

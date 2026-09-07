@@ -32,6 +32,7 @@ from faceattend.vision.head_pose import (
     estimate_matrix_head_pose,
     estimate_solvepnp_head_pose,
 )
+from faceattend.vision.matcher import ExactNumpyMatcher
 from faceattend.vision.model_lifecycle import LazyModel
 from faceattend.vision.passive_liveness import (
     MiniFASNetPassiveLivenessDetector,
@@ -58,6 +59,7 @@ __all__ = [
     "ContinuityStatus",
     "ExponentialPoseSmoother",
     "EmbeddingError",
+    "ExactNumpyMatcher",
     "DuplicateFrameDetector",
     "FaceContinuityConfig",
     "FaceContinuityTracker",
