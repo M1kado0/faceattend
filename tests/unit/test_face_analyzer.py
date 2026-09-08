@@ -282,6 +282,20 @@ def test_embedding_requires_both_passes_and_returns_contract_vector(tmp_path: Pa
     runtime.close()
 
 
+def test_registration_can_embed_an_earlier_neutral_candidate_after_liveness(tmp_path: Path) -> None:
+    runtime, calls = _runtime(tmp_path)
+    earlier = runtime(Frame(_pixels(), 1_000_000, 1))
+    runtime(Frame(_pixels(), 2_000_000, 2))
+    active = LivenessEvidence(LivenessKind.ACTIVE, EvidenceDecision.PASSED, 1, 1, "v1")
+    passive = LivenessEvidence(LivenessKind.PASSIVE, EvidenceDecision.PASSED, 1, 0.85, "v1")
+
+    vector = runtime.extract_embedding(earlier, active=active, passive=passive)
+
+    assert vector.shape == (512,)
+    assert calls["embedding"] == 1
+    runtime.close()
+
+
 @pytest.mark.parametrize("count,reason", [(0, "no_face"), (2, "multiple_faces")])
 def test_detector_face_count_failure_is_explicit(tmp_path: Path, count: int, reason: str) -> None:
     runtime, calls = _runtime(tmp_path, face_count=count)

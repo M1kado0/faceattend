@@ -1,9 +1,9 @@
 # FaceAttend Local-First Migration Plan
 
-**Last reconciled:** 2026-09-07
+**Last reconciled:** 2026-09-08
 
-**Current phase:** Phase 4 — PySide6 shell and runtime concurrency
-**Overall status:** PHASE 3 COMPLETED; PHASE 4 READY
+**Current phase:** Phase 6 — Attendance check-in application workflow
+**Overall status:** PHASE 5 COMPLETED; PHASE 6 READY
 
 Target: PySide6 desktop UI + headless Python CV/application core + SQLite +
 reproducible evaluation. Preserve the web implementation until verified parity
@@ -39,8 +39,8 @@ experiment or a passing synthetic test into measured security effectiveness.
 | 1 | Headless types, protocols, and workflow-state foundation | COMPLETED — foundation only |
 | 2 | CV adapters, frame evidence, randomized sessions, headless runtime | COMPLETED |
 | 3 | SQLite, audit persistence, exact local matcher | COMPLETED |
-| 4 | Qt shell, camera/inference concurrency, session presentation | PENDING |
-| 5 | Enrollment using the shared liveness runtime | PENDING |
+| 4 | Qt shell, camera/inference concurrency, session presentation | COMPLETED |
+| 5 | Enrollment using the shared liveness runtime | COMPLETED |
 | 6 | Attendance using the shared liveness runtime and matcher | PENDING |
 | 7 | Reproducible recognition, liveness, and runtime evaluation | PENDING — pose diagnostics already exist |
 | 8 | Parity, packaging, and portfolio evidence | PENDING |
@@ -419,36 +419,107 @@ transactions own schema changes. Higher-level repositories must use this boundar
 
 ## Phase 4 — PySide6 shell and runtime concurrency
 
-**Status: PENDING**
+**Status: COMPLETED**
 
-- [ ] Reuse Phase 2 capture/processor interfaces in camera and inference workers;
+- [x] Reuse Phase 2 capture/processor interfaces in camera and inference workers;
       keep one camera owner and one owner of loaded inference models.
-- [ ] Add Qt Widgets views with no inference/model logic in widgets.
-- [ ] Use capacity-one latest-frame backpressure and signals/slots, not networking.
-- [ ] Separate preview and inference rates; timestamp results and drop stale frames.
-- [ ] Present randomized instructions, neutral guidance, progress, and failures
+- [x] Add Qt Widgets views with no inference/model logic in widgets.
+- [x] Use capacity-one latest-frame backpressure and signals/slots, not networking.
+- [x] Separate preview and inference rates; timestamp results and drop stale frames.
+- [x] Present randomized instructions, neutral guidance, progress, and failures
       from session evidence; the GUI never awards liveness progress.
-- [ ] Add explicit mode transitions, cancellation, shutdown, camera/model errors,
+- [x] Add explicit mode transitions, cancellation, shutdown, camera/model errors,
       and no-camera/model states; verify repeated start/stop and responsiveness.
-- [ ] Keep the CV/application core runnable and testable without Qt.
+- [x] Keep the CV/application core runnable and testable without Qt.
 
-The existing synchronous worker is a reusable foundation, not completion of
-Qt threading, bounded preview delivery, or responsive GUI operation.
+The earlier synchronous worker remains available for headless diagnostics; the
+Qt runtime now owns interactive capture, bounded handoff, and inference cadence.
+
+### 2026-09-07 — Phase 4 — PySide6 shell and concurrency completed
+
+- Outcome: added a Qt Widgets desktop shell with home, registration, and
+  attendance views; a restartable desktop lifecycle; one camera-owning worker;
+  and one inference/model-owning worker. Workers communicate with the GUI using
+  queued signals/slots and no REST or WebSocket boundary.
+- Backpressure: `LatestFrameBuffer` is thread-safe and capacity one. Capture
+  replaces unprocessed frames, inference takes only the newest frame, and
+  expired/non-monotonic frames are rejected. Preview and inference intervals
+  are independently configurable.
+- Phase 2 reuse: `SessionProcessor` accepts the existing callable frame/evidence
+  boundary. `MediaPipeDesktopSessionProcessor` maps the existing liveness
+  session's randomized instruction, completed challenges, post-active neutral
+  guidance, terminal state, and failure reason to immutable presentation facts.
+- GUI boundary: widgets render frames and `SessionPresentation`; they contain no
+  model inference, liveness thresholds, challenge completion logic, database
+  access, or network calls. Progress comes only from completed session evidence.
+- Lifecycle: tests cover separate camera/inference thread ownership, capacity-one
+  replacement, camera/model startup failure, cancellation, terminal cleanup,
+  two consecutive start/stop cycles, and a GUI heartbeat while inference blocks.
+- Dependency: use `pyside6-essentials` because this phase needs Qt Core, Gui, and
+  Widgets but not the much larger Qt Addons distribution.
+- Launch: `uv run python scripts/run_desktop.py`. Until Phase 5/6 supplies the
+  configured real session factory, choosing a mode intentionally reports the
+  explicit no-model/configuration state instead of pretending inference exists.
+- Tests/checks: focused Phase 4 suite **11 passed**. Full offscreen suite
+  **264 passed** with seven existing dependency/deprecation warnings. Ruff and
+  `mypy src` passed for 37 source files. An offscreen window open/shutdown smoke
+  passed.
+- Evidence level: deterministic headless tests, fake capture/model lifecycle
+  integration, and offscreen Qt rendering. No real-camera desktop session or GUI
+  performance benchmark has yet been performed.
+- Known limitations: enrollment, attendance persistence, real model/session
+  factory composition, styling/packaging, and physical-camera UX validation are
+  later phases. Importing the current broad `faceattend.vision` package still
+  incurs noticeable dependency startup overhead and should be profiled before
+  packaging.
+- Next gate: Phase 5 connects explicit consent, the real Phase 2 liveness runtime,
+  post-PAD template extraction, and Phase 3 enrollment persistence through this
+  worker/presentation shell.
+- Approval: no model, threshold, retention, legal, or legacy-removal decision was
+  changed.
 
 ## Phase 5 — Enrollment application workflow
 
-**Status: PENDING**
+**Status: COMPLETED**
 
-- [ ] Coordinate explicit consent, quality/single-face checks, and the shared
+- [x] Coordinate explicit consent, quality/single-face checks, and the shared
       randomized-liveness runtime; do not implement another challenge engine.
-- [ ] Require active pass then temporal PAD pass before template extraction.
-- [ ] Select 3–5 diverse high-quality normalized templates with pose metadata.
-- [ ] Persist identity/templates/consent/audit atomically with failure rollback.
-- [ ] Test cancellation, retry, no/multiple faces, liveness rejection, model and
+- [x] Require active pass then temporal PAD pass before template extraction.
+- [x] Select 3–5 diverse high-quality normalized templates with pose metadata.
+- [x] Persist identity/templates/consent/audit atomically with failure rollback.
+- [x] Test cancellation, retry, no/multiple faces, liveness rejection, model and
       database failures; clear ordinary raw-frame buffers on all exit paths.
 
 Green-oval sectors are deferred optional guidance, not required implementation.
 Pose diversity remains an enrollment concern without requiring that animation.
+
+### 2026-09-08 — Phase 5 — Enrollment workflow completed
+
+- Outcome: added a headless registration coordinator that reuses the existing
+  randomized active-liveness and post-active temporal PAD session. Explicit
+  consent is required before capture; embedding extraction cannot begin until
+  both gates pass.
+- Templates: the completed session transfers its bounded in-memory neutral
+  candidates once. The coordinator selects 3–5 quality-approved frames using
+  sharpness plus pose-space diversity, extracts normalized embeddings, and
+  stores both pose bins and numeric yaw/pitch/roll metadata.
+- Persistence: migration 004 adds template pose metadata. Identity, consent,
+  passed liveness evidence, enrollment, 3–5 templates, and sanitized audit
+  events commit in one SQLite transaction. A mid-transaction error rolls all
+  subject and biometric records back.
+- Failure behavior: consent denial, cancellation, retry, no/multiple faces,
+  active or passive rejection, model failure, and database failure are covered.
+  PAD and candidate buffers clear on terminal paths; frames are not persisted.
+- Tests: focused Phase 5, persistence, evidence, and model tests passed. Full
+  `QT_QPA_PLATFORM=offscreen uv run pytest -q`: **277 passed**, eight existing
+  dependency/deprecation warnings. `ruff check .`, `mypy src` (39 files), and
+  `git diff --check` passed.
+- Evidence: automated synthetic/unit and SQLite integration evidence only. No
+  new real-camera enrollment or security-effectiveness result was claimed.
+- Limitation: the Phase 4 launcher still needs operator-entered registration
+  details and a pinned real-model factory before GUI camera enrollment can run.
+- Next gate: Phase 6 reuses this gate for matching and idempotent check-in.
+- Approval: no model, threshold, retention, legal, or legacy-removal decision changed.
 
 ## Phase 6 — Attendance check-in application workflow
 

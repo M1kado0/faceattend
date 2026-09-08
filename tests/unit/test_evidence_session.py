@@ -222,6 +222,22 @@ def test_embedding_candidate_is_best_neutral_frame_and_single_use() -> None:
         session.take_embedding_candidate()
 
 
+def test_registration_can_transfer_bounded_neutral_candidates_only_after_both_passes() -> None:
+    session, _pad = runtime()
+    for index in range(1, 5):
+        session.observe_evidence(evidence(index))
+    for index in range(5, 12):
+        session.observe_evidence(evidence(index))
+
+    candidates = session.take_embedding_candidates(min_candidates=3, max_candidates=5)
+
+    assert len(candidates) == 3
+    assert all(item.face_count == 1 and item.pose is not None for item in candidates)
+    assert session.retained_candidate_count == 0
+    with pytest.raises(RuntimeError, match="insufficient neutral"):
+        session.take_embedding_candidates(min_candidates=3, max_candidates=5)
+
+
 def test_embedding_extraction_runs_only_after_post_active_pad_pass() -> None:
     pad = PAD()
     calls: list[int] = []
@@ -263,6 +279,7 @@ def test_post_active_timeout_and_cancellation_clear_transient_frames() -> None:
     cancelled.cancel()
     assert cancelled.phase is LivenessRuntimePhase.CANCELLED
     assert cancelled.passive.frames == ()
+    assert cancelled.retained_candidate_count == 0
     with pytest.raises(RuntimeError, match="completed liveness"):
         cancelled.take_embedding_candidate()
 

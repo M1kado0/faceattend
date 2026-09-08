@@ -19,7 +19,7 @@ def test_initialize_applies_migrations_once_and_enforces_foreign_keys(tmp_path: 
         versions = connection.execute(
             "SELECT version FROM schema_migrations ORDER BY version"
         ).fetchall()
-    assert versions == [(1,), (2,), (3,)]
+    assert versions == [(1,), (2,), (3,), (4,)]
 
 
 def test_transaction_rolls_back_all_writes_on_failure(tmp_path: Path) -> None:

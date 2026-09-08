@@ -344,6 +344,7 @@ class MediaPipeLivenessSession:
         self._neutral_started_ms: int | None = None
         self._post_active_started_ms: int | None = None
         self._best_neutral_evidence: FrameEvidence | None = None
+        self._neutral_candidates: list[FrameEvidence] = []
 
     @property
     def instruction(self) -> str:
@@ -433,6 +434,7 @@ class MediaPipeLivenessSession:
             self.phase = LivenessRuntimePhase.FACE_CAMERA
             self._neutral_started_ms = None
             self._best_neutral_evidence = None
+            self._neutral_candidates.clear()
             self.passive.reset()
             return self.active.evaluator.result
 
@@ -451,13 +453,34 @@ class MediaPipeLivenessSession:
         return self.active.evaluator.result
 
     def _retain_best_neutral(self, evidence: FrameEvidence) -> None:
-        """Retain one sharp neutral candidate in memory for embedding extraction."""
+        """Retain a bounded neutral set in memory for post-PAD template extraction."""
+        if len(self._neutral_candidates) < self.passive.max_frames:
+            self._neutral_candidates.append(evidence)
         current = self._best_neutral_evidence
         if current is None or (
             evidence.quality is not None
             and (current.quality is None or evidence.quality.sharpness > current.quality.sharpness)
         ):
             self._best_neutral_evidence = evidence
+
+    @property
+    def retained_candidate_count(self) -> int:
+        return len(self._neutral_candidates)
+
+    def take_embedding_candidates(
+        self, *, min_candidates: int = 3, max_candidates: int = 5
+    ) -> tuple[FrameEvidence, ...]:
+        """Transfer neutral frames once, and only after active and PAD pass."""
+        if min_candidates <= 0 or max_candidates < min_candidates:
+            raise ValueError("candidate limits must be positive and ordered")
+        if self.result.decision is not EvidenceDecision.PASSED:
+            raise RuntimeError("embedding candidates require completed liveness")
+        if len(self._neutral_candidates) < min_candidates:
+            raise RuntimeError("insufficient neutral embedding candidates")
+        candidates = tuple(self._neutral_candidates[:max_candidates])
+        self._neutral_candidates.clear()
+        self._best_neutral_evidence = None
+        return candidates
 
     def take_embedding_candidate(self) -> FrameEvidence:
         """Transfer the best neutral frame once, after both liveness gates pass."""
@@ -467,6 +490,7 @@ class MediaPipeLivenessSession:
             raise RuntimeError("no neutral embedding candidate is available")
         evidence = self._best_neutral_evidence
         self._best_neutral_evidence = None
+        self._neutral_candidates.clear()
         return evidence
 
     def _fail(self, reason: str) -> None:
@@ -474,6 +498,7 @@ class MediaPipeLivenessSession:
         self.phase = LivenessRuntimePhase.FAILED
         self._neutral_started_ms = None
         self._best_neutral_evidence = None
+        self._neutral_candidates.clear()
         self._passive_evidence = self.passive.abort(reason)
 
     def __call__(self, frame: Frame) -> FrameEvidence:
@@ -510,6 +535,7 @@ class MediaPipeLivenessSession:
             self.failure_reason = self._passive_evidence.reason or "passive_liveness_failed"
             self.phase = LivenessRuntimePhase.FAILED
             self._best_neutral_evidence = None
+            self._neutral_candidates.clear()
         else:
             if self.embedding_extractor is not None:
                 try:
@@ -530,6 +556,7 @@ class MediaPipeLivenessSession:
                     self.phase = LivenessRuntimePhase.FAILED
                     return self._passive_evidence
                 self._best_neutral_evidence = None
+                self._neutral_candidates.clear()
             self.phase = LivenessRuntimePhase.COMPLETED
         return self._passive_evidence
 
@@ -542,6 +569,7 @@ class MediaPipeLivenessSession:
             self.failure_reason = "cancelled"
             self._passive_evidence = self.passive.cancel()
             self._best_neutral_evidence = None
+            self._neutral_candidates.clear()
             self.embedding = None
             self._neutral_started_ms = None
             self.phase = LivenessRuntimePhase.CANCELLED

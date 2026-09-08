@@ -35,3 +35,10 @@ class ErasureResult:
     person_id: str
     template_count: int
     attendance_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class EnrollmentWrite:
+    person_id: str
+    consent_id: str
+    enrollment_id: str

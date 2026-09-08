@@ -13,8 +13,13 @@ from uuid import uuid4
 import numpy as np
 
 from faceattend.persistence.database import SQLiteDatabase
-from faceattend.persistence.records import AttendanceWrite, ErasureResult, LivenessAttempt
-from faceattend.vision.types import EmbeddingTemplate, FaceQuality, ModelMetadata
+from faceattend.persistence.records import (
+    AttendanceWrite,
+    EnrollmentWrite,
+    ErasureResult,
+    LivenessAttempt,
+)
+from faceattend.vision.types import EmbeddingTemplate, FaceQuality, HeadPose, ModelMetadata
 
 
 class PersistenceError(ValueError):
@@ -109,6 +114,161 @@ class LocalRepository:
                 created_at=created_at,
             )
         return person_id, consent_id
+
+    def register_person_atomically(
+        self,
+        display_name: str,
+        *,
+        purpose: str,
+        actor_id: str,
+        configuration_id: str,
+        model_id: str,
+        templates: Sequence[EmbeddingTemplate],
+        liveness_attempt: LivenessAttempt,
+        completed_at: datetime,
+    ) -> EnrollmentWrite:
+        """Commit identity, consent, liveness, templates, and audits together.
+
+        The caller may generate the person identifier before inference so every
+        template is bound to one subject, but no partial biometric record is
+        visible unless this transaction commits.
+        """
+        if not display_name.strip() or not purpose.strip():
+            raise PersistenceError("display name and consent purpose must be non-empty")
+        enrollment_templates = tuple(templates)
+        if not 3 <= len(enrollment_templates) <= 5:
+            raise PersistenceError("registration requires 3 to 5 embedding templates")
+        person_ids = {template.person_id for template in enrollment_templates}
+        if len(person_ids) != 1:
+            raise PersistenceError("all templates must belong to one person")
+        person_id = next(iter(person_ids))
+        if liveness_attempt.person_id != person_id or liveness_attempt.operation != "registration":
+            raise PersistenceError("registration liveness must belong to the enrollment person")
+        if (
+            liveness_attempt.active_decision != "passed"
+            or liveness_attempt.passive_decision != "passed"
+            or liveness_attempt.failure_reason is not None
+        ):
+            raise PersistenceError("registration requires passed active and passive liveness")
+        if liveness_attempt.configuration_version_id != configuration_id:
+            raise PersistenceError("liveness configuration does not match enrollment")
+        validated = tuple(
+            (
+                template,
+                _validate_embedding(template),
+                _json(asdict(template.quality)),
+                _json(asdict(template.pose)) if template.pose is not None else None,
+            )
+            for template in enrollment_templates
+        )
+        consent_id, enrollment_id = str(uuid4()), str(uuid4())
+        timestamp = _timestamp(completed_at)
+        with self.database.transaction() as connection:
+            configuration = connection.execute(
+                "SELECT 1 FROM configuration_versions WHERE id = ?", (configuration_id,)
+            ).fetchone()
+            model = connection.execute(
+                "SELECT role, name, version, checksum FROM model_versions WHERE id = ?",
+                (model_id,),
+            ).fetchone()
+            expected_models = {
+                ("embedding", item.model_name, item.model_version, item.model_checksum)
+                for item in enrollment_templates
+            }
+            if configuration is None or model is None or expected_models != {tuple(model)}:
+                raise PersistenceError("registration configuration or model is incompatible")
+
+            connection.execute(
+                "INSERT INTO people(id, display_name, created_at) VALUES (?, ?, ?)",
+                (person_id, display_name.strip(), timestamp),
+            )
+            connection.execute(
+                "INSERT INTO consent_records(id, person_id, purpose, granted_at) "
+                "VALUES (?, ?, ?, ?)",
+                (consent_id, person_id, purpose.strip(), timestamp),
+            )
+            connection.execute(
+                "INSERT INTO liveness_attempts(id, person_id, operation, "
+                "challenge_sequence_json, completed_challenges_json, active_decision, "
+                "passive_decision, failure_reason, passive_median, passive_minimum, "
+                "suspicious_frame_count, processing_failure_count, configuration_version_id, "
+                "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                _liveness_values(liveness_attempt),
+            )
+            connection.execute(
+                "INSERT INTO enrollment_sessions(id, person_id, consent_record_id, "
+                "configuration_version_id, status, started_at, completed_at) "
+                "VALUES (?, ?, ?, ?, 'completed', ?, ?)",
+                (enrollment_id, person_id, consent_id, configuration_id, timestamp, timestamp),
+            )
+            for template, vector, quality_json, pose_json in validated:
+                connection.execute(
+                    "INSERT INTO embedding_templates(id, person_id, enrollment_session_id, "
+                    "model_version_id, embedding, dimension, dtype, normalized, pose_bin, "
+                    "quality_json, created_at, pose_json) "
+                    "VALUES (?, ?, ?, ?, ?, ?, 'float32', 1, ?, ?, ?, ?)",
+                    (
+                        template.template_id,
+                        person_id,
+                        enrollment_id,
+                        model_id,
+                        vector.tobytes(order="C"),
+                        int(vector.size),
+                        template.pose_bin,
+                        quality_json,
+                        _timestamp(template.created_at),
+                        pose_json,
+                    ),
+                )
+
+            self._audit(
+                connection,
+                actor_id=actor_id,
+                action="person.created",
+                target_id=person_id,
+                metadata={"display_name_recorded": True},
+                created_at=completed_at,
+            )
+            self._audit(
+                connection,
+                actor_id=actor_id,
+                action="consent.granted",
+                target_id=person_id,
+                metadata={"consent_record_id": consent_id, "purpose": purpose.strip()},
+                created_at=completed_at,
+            )
+            self._audit(
+                connection,
+                actor_id=actor_id,
+                action="liveness.attempt",
+                target_id=person_id,
+                metadata=_liveness_audit_metadata(liveness_attempt),
+                created_at=completed_at,
+            )
+            self._audit(
+                connection,
+                actor_id=actor_id,
+                action="enrollment.started",
+                target_id=person_id,
+                metadata={
+                    "enrollment_id": enrollment_id,
+                    "configuration_version_id": configuration_id,
+                },
+                created_at=completed_at,
+            )
+            self._audit(
+                connection,
+                actor_id=actor_id,
+                action="enrollment.completed",
+                target_id=person_id,
+                metadata={
+                    "enrollment_id": enrollment_id,
+                    "template_ids": [item.template_id for item in enrollment_templates],
+                    "model_version_id": model_id,
+                },
+                created_at=completed_at,
+            )
+        return EnrollmentWrite(person_id, consent_id, enrollment_id)
 
     def start_enrollment(
         self,
@@ -238,7 +398,8 @@ class LocalRepository:
         with self.database.connection() as connection:
             rows = connection.execute(
                 "SELECT t.id, t.person_id, t.embedding, t.dimension, t.dtype, t.normalized, "
-                "t.pose_bin, t.quality_json, t.created_at, m.name, m.version, m.checksum "
+                "t.pose_bin, t.quality_json, t.created_at, m.name, m.version, m.checksum, "
+                "t.pose_json "
                 "FROM embedding_templates AS t JOIN model_versions AS m "
                 "ON m.id = t.model_version_id WHERE m.role = 'embedding' AND m.name = ? "
                 "AND m.version = ? AND m.checksum = ? ORDER BY t.created_at, t.id",
@@ -544,6 +705,7 @@ def _template_from_row(row: tuple[Any, ...]) -> EmbeddingTemplate:
         raise PersistenceError("stored embedding is invalid")
     quality_data = json.loads(row[7])
     quality_data["warnings"] = tuple(quality_data.get("warnings", ()))
+    pose_data = json.loads(row[12]) if len(row) > 12 and row[12] is not None else None
     return EmbeddingTemplate(
         template_id=str(row[0]),
         person_id=str(row[1]),
@@ -555,7 +717,40 @@ def _template_from_row(row: tuple[Any, ...]) -> EmbeddingTemplate:
         pose_bin=row[6],
         quality=FaceQuality(**quality_data),
         created_at=datetime.fromisoformat(row[8]),
+        pose=HeadPose(**pose_data) if pose_data is not None else None,
     )
+
+
+def _liveness_values(attempt: LivenessAttempt) -> tuple[Any, ...]:
+    return (
+        attempt.attempt_id,
+        attempt.person_id,
+        attempt.operation,
+        _json(list(attempt.challenge_sequence)),
+        _json(list(attempt.completed_challenges)),
+        attempt.active_decision,
+        attempt.passive_decision,
+        attempt.failure_reason,
+        attempt.passive_median,
+        attempt.passive_minimum,
+        attempt.suspicious_frame_count,
+        attempt.processing_failure_count,
+        attempt.configuration_version_id,
+        _timestamp(attempt.created_at),
+    )
+
+
+def _liveness_audit_metadata(attempt: LivenessAttempt) -> dict[str, Any]:
+    return {
+        "liveness_attempt_id": attempt.attempt_id,
+        "operation": attempt.operation,
+        "challenge_sequence": list(attempt.challenge_sequence),
+        "completed_challenges": list(attempt.completed_challenges),
+        "active_decision": attempt.active_decision,
+        "passive_decision": attempt.passive_decision,
+        "failure_reason": attempt.failure_reason,
+        "configuration_version_id": attempt.configuration_version_id,
+    }
 
 
 def _reject_raw_biometrics(value: Any, path: str = "metadata") -> None:

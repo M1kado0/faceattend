@@ -155,6 +155,7 @@ class EmbeddingTemplate:
     pose_bin: str | None
     quality: FaceQuality
     created_at: datetime
+    pose: HeadPose | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -95,6 +95,62 @@ def test_registration_records_consent_template_metadata_and_survives_restart(
     )
 
 
+def test_atomic_registration_rolls_back_identity_consent_templates_and_audit(
+    tmp_path: Path,
+) -> None:
+    repository = _repository(tmp_path)
+    configuration_id = repository.add_configuration({}, created_at=NOW)
+    model_id = repository.add_model("embedding", MODEL, created_at=NOW)
+    person_id = "atomic-person"
+    templates = tuple(
+        EmbeddingTemplate(
+            "duplicate-template-id",
+            person_id,
+            _embedding(index),
+            MODEL.name,
+            MODEL.version,
+            MODEL.checksum,
+            True,
+            "neutral",
+            FaceQuality(True, 200.0 + index, 0.5, 0.1),
+            NOW,
+        )
+        for index in range(3)
+    )
+    attempt = LivenessAttempt(
+        "atomic-attempt",
+        person_id,
+        "registration",
+        ("blink", "turn_left"),
+        ("blink", "turn_left"),
+        "passed",
+        "passed",
+        None,
+        0.99,
+        0.98,
+        0,
+        0,
+        configuration_id,
+        NOW,
+    )
+
+    with pytest.raises(sqlite3.IntegrityError):
+        repository.register_person_atomically(
+            "Atomic",
+            purpose="attendance",
+            actor_id="operator",
+            configuration_id=configuration_id,
+            model_id=model_id,
+            templates=templates,
+            liveness_attempt=attempt,
+            completed_at=NOW,
+        )
+
+    assert repository.person_exists(person_id) is False
+    assert repository.get_liveness_attempt("atomic-attempt") is None
+    assert repository.audit_actions() == ()
+
+
 def test_liveness_attempt_and_sanitized_audit_preserve_decision_evidence(tmp_path: Path) -> None:
     repository = _repository(tmp_path)
     configuration_id = repository.add_configuration({"active_policy": "v1"}, created_at=NOW)

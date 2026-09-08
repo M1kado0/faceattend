@@ -302,7 +302,8 @@ class HeadlessFaceAnalyzer:
 
         These result objects are not authentication tokens. The application must
         bind them to the same continuous session; that orchestration is separate.
-        Only the latest valid evidence produced by this processor is eligible.
+        Earlier in-memory neutral candidates from that completed session are
+        valid because registration intentionally extracts several templates.
         """
         if self._closed:
             raise RuntimeError("face analyzer is closed")
@@ -319,8 +320,7 @@ class HeadlessFaceAnalyzer:
         ):
             raise ModelCompatibilityError("liveness model version mismatch")
         if (
-            evidence is not self._latest
-            or evidence.failure_reason is not None
+            evidence.failure_reason is not None
             or evidence.face_count != 1
             or evidence.face is None
         ):
