@@ -8,7 +8,7 @@ from dataclasses import replace
 from faceattend.application.mediapipe_session import MediaPipeDesktopSessionProcessor
 from faceattend.application.registration_service import RegistrationCoordinator
 from faceattend.application.runtime import DesktopMode, RuntimeStatus, SessionPresentation
-from faceattend.vision.types import Frame, FrameEvidence, RegistrationStatus
+from faceattend.vision.types import Frame, FrameEvidence, LivenessEvidence, RegistrationStatus
 
 
 class RegistrationDesktopSessionProcessor:
@@ -44,11 +44,15 @@ class RegistrationDesktopSessionProcessor:
             RegistrationStatus.FAILED: RuntimeStatus.FAILED,
             RegistrationStatus.CANCELLED: RuntimeStatus.CANCELLED,
         }[result.status]
+        failure_reason = _registration_failure_reason(
+            result.reason,
+            getattr(self.coordinator.session.result, "passive", None),
+        )
         return replace(
             presentation,
             status=status,
             instruction=("Registration complete" if status is RuntimeStatus.COMPLETED else "Retry"),
-            failure_reason=result.reason,
+            failure_reason=failure_reason,
         )
 
     def cancel(self) -> None:
@@ -58,3 +62,22 @@ class RegistrationDesktopSessionProcessor:
         if self.coordinator.result is None:
             self.coordinator.cancel()
         self._presentation.close()
+
+
+def _registration_failure_reason(
+    reason: str | None,
+    passive: object,
+) -> str | None:
+    """Give the operator PAD numbers needed to diagnose a failed local attempt.
+
+    # PRIVACY: this deliberately exposes only aggregate model scores, never
+    # frames, landmarks, embeddings, or any other biometric payload.
+    """
+    if not isinstance(passive, LivenessEvidence) or passive.reason is None:
+        return reason
+    if passive.reason != "liveness_score_below_threshold":
+        return passive.reason
+    minimum = "n/a" if passive.minimum_score is None else f"{passive.minimum_score:.3f}"
+    median = "n/a" if passive.median_score is None else f"{passive.median_score:.3f}"
+    threshold = "n/a" if passive.threshold is None else f"{passive.threshold:.3f}"
+    return f"PAD score below threshold (min {minimum}, median {median}, threshold {threshold})"

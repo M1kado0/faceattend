@@ -6,7 +6,12 @@ import numpy as np
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
+    QHBoxLayout,
     QLabel,
+    QLineEdit,
     QProgressBar,
     QPushButton,
     QVBoxLayout,
@@ -55,13 +60,13 @@ class SessionView(QWidget):
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self.cancel_requested)
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.title_label)
-        layout.addWidget(self.preview_label, stretch=1)
-        layout.addWidget(self.instruction_label)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.status_label)
-        layout.addWidget(self.cancel_button)
+        self.content_layout = QVBoxLayout(self)
+        self.content_layout.addWidget(self.title_label)
+        self.content_layout.addWidget(self.preview_label, stretch=1)
+        self.content_layout.addWidget(self.instruction_label)
+        self.content_layout.addWidget(self.progress_bar)
+        self.content_layout.addWidget(self.status_label)
+        self.content_layout.addWidget(self.cancel_button)
 
     @Slot(object)
     def apply_presentation(self, presentation: object) -> None:
@@ -97,10 +102,53 @@ class SessionView(QWidget):
 
 
 class RegistrationView(SessionView):
+    start_requested = Signal(str, bool)
+
     def __init__(self) -> None:
         super().__init__("Face registration")
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Person name")
+        self.consent_checkbox = QCheckBox("I have explicit consent to register this person")
+        self.start_button = QPushButton("Start registration")
+        self.start_button.clicked.connect(
+            lambda: self.start_requested.emit(
+                self.name_input.text(), self.consent_checkbox.isChecked()
+            )
+        )
+        form = QFormLayout()
+        form.addRow("Name", self.name_input)
+        form.addRow(self.consent_checkbox)
+        form.addRow(self.start_button)
+        self.content_layout.insertLayout(1, form)
 
 
 class AttendanceView(SessionView):
+    start_requested = Signal(str)
+    create_session_requested = Signal(str)
+
     def __init__(self) -> None:
         super().__init__("Attendance check-in")
+        self.session_choices = QComboBox()
+        self.session_name_input = QLineEdit()
+        self.session_name_input.setPlaceholderText("New attendance session name")
+        self.create_button = QPushButton("Create session")
+        self.start_button = QPushButton("Start check-in")
+        self.create_button.clicked.connect(
+            lambda: self.create_session_requested.emit(self.session_name_input.text())
+        )
+        self.start_button.clicked.connect(
+            lambda: self.start_requested.emit(self.session_choices.currentData() or "")
+        )
+        form = QFormLayout()
+        form.addRow("Attendance session", self.session_choices)
+        row = QHBoxLayout()
+        row.addWidget(self.session_name_input)
+        row.addWidget(self.create_button)
+        form.addRow("New session", row)
+        form.addRow(self.start_button)
+        self.content_layout.insertLayout(1, form)
+
+    def set_sessions(self, sessions: tuple[tuple[str, str], ...]) -> None:
+        self.session_choices.clear()
+        for session_id, name in sessions:
+            self.session_choices.addItem(name, session_id)

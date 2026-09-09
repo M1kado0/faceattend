@@ -28,10 +28,17 @@ from faceattend.vision.types import (
 
 
 class EnrollmentSession(Protocol):
-    phase: Any
-    result: Any
-    failure_reason: str | None
-    active: Any
+    @property
+    def phase(self) -> Any: ...
+
+    @property
+    def result(self) -> Any: ...
+
+    @property
+    def failure_reason(self) -> str | None: ...
+
+    @property
+    def active(self) -> Any: ...
 
     @property
     def instruction(self) -> str: ...
@@ -113,9 +120,7 @@ class RegistrationCoordinator:
         phase = str(getattr(self.session.phase, "value", self.session.phase))
         if phase in {"failed", "cancelled"}:
             status = (
-                RegistrationStatus.CANCELLED
-                if phase == "cancelled"
-                else RegistrationStatus.FAILED
+                RegistrationStatus.CANCELLED if phase == "cancelled" else RegistrationStatus.FAILED
             )
             self._result = RegistrationResult(
                 status,
@@ -144,9 +149,7 @@ class RegistrationCoordinator:
         )
 
         try:
-            candidates = self.session.take_embedding_candidates(
-                min_candidates=3, max_candidates=5
-            )
+            candidates = self.session.take_embedding_candidates(min_candidates=3, max_candidates=5)
             selected = select_diverse_template_evidence(candidates, maximum=5)
             if len(selected) < 3:
                 raise ValueError("insufficient template candidates")
@@ -236,9 +239,7 @@ class RegistrationCoordinator:
             pose=evidence.pose,
         )
 
-    def _liveness_attempt(
-        self, passive: LivenessEvidence, created_at: datetime
-    ) -> LivenessAttempt:
+    def _liveness_attempt(self, passive: LivenessEvidence, created_at: datetime) -> LivenessAttempt:
         evaluator = self.session.active.evaluator
         sequence = tuple(_action_name(item) for item in evaluator.phases)
         completed = tuple(_action_name(item) for item in evaluator.result.completed_phases)

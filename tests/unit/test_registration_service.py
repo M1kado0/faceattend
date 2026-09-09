@@ -14,7 +14,10 @@ from faceattend.application.registration_service import (
     RegistrationCoordinator,
     RegistrationRequest,
 )
-from faceattend.application.registration_session import RegistrationDesktopSessionProcessor
+from faceattend.application.registration_session import (
+    RegistrationDesktopSessionProcessor,
+    _registration_failure_reason,
+)
 from faceattend.application.runtime import RuntimeStatus
 from faceattend.persistence.database import SQLiteDatabase
 from faceattend.persistence.repositories import LocalRepository
@@ -368,3 +371,21 @@ def test_registration_processor_reports_persistence_outcome(tmp_path: Path) -> N
 
     assert presentation.status is RuntimeStatus.COMPLETED
     assert presentation.instruction == "Registration complete"
+
+
+def test_registration_pad_failure_exposes_aggregate_scores_without_biometric_data() -> None:
+    passive = LivenessEvidence(
+        LivenessKind.PASSIVE,
+        EvidenceDecision.FAILED,
+        0.52,
+        0.85,
+        "MiniFASNetV2",
+        reason="liveness_score_below_threshold",
+        median_score=0.74,
+        minimum_score=0.52,
+        suspicious_frame_count=2,
+    )
+
+    message = _registration_failure_reason("liveness_incomplete", passive)
+
+    assert message == "PAD score below threshold (min 0.520, median 0.740, threshold 0.850)"

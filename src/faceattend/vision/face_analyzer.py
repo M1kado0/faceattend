@@ -319,11 +319,7 @@ class HeadlessFaceAnalyzer:
             or passive.model_version != self.manifest.passive.metadata.version
         ):
             raise ModelCompatibilityError("liveness model version mismatch")
-        if (
-            evidence.failure_reason is not None
-            or evidence.face_count != 1
-            or evidence.face is None
-        ):
+        if evidence.failure_reason is not None or evidence.face_count != 1 or evidence.face is None:
             raise ValueError("embedding requires the latest valid single-face evidence")
         self.manifest.embedding.verify(
             ModelMetadata(
@@ -353,7 +349,10 @@ class HeadlessFaceAnalyzer:
 
 
 def create_face_analyzer(
-    manifest: RuntimeModelManifest, *, quality_config: QualityConfig | None = None
+    manifest: RuntimeModelManifest,
+    *,
+    quality_config: QualityConfig | None = None,
+    passive_threshold: float = 0.85,
 ) -> HeadlessFaceAnalyzer:
     """Construct the real local adapters from verified files; no downloads.
 
@@ -380,7 +379,9 @@ def create_face_analyzer(
         detector=InsightFaceDetector(**options(manifest.detector)),
         aligner=InsightFaceAligner(image_size=manifest.alignment_size),
         embedder=InsightFaceEmbedder(**options(manifest.embedding)),
-        passive=MiniFASNetPassiveLivenessDetector(**options(manifest.passive)),
+        passive=MiniFASNetPassiveLivenessDetector(
+            **options(manifest.passive), threshold=passive_threshold
+        ),
         landmarker=MediaPipeFrameLandmarker(manifest.landmarker),
         quality_config=quality_config,
     )

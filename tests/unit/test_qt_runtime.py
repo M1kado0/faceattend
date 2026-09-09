@@ -84,6 +84,19 @@ class _CompletingProcessor(_Processor):
         )
 
 
+class _FailingProcessor(_Processor):
+    def presentation(self, evidence: FrameEvidence) -> SessionPresentation:
+        return SessionPresentation(
+            self.mode,
+            RuntimeStatus.FAILED,
+            "RETRY",
+            0,
+            2,
+            evidence,
+            "liveness_score_below_threshold",
+        )
+
+
 class _SlowProcessor(_Processor):
     def __call__(self, frame):
         time.sleep(0.1)
@@ -196,6 +209,41 @@ def test_terminal_session_stops_camera_and_inference_workers() -> None:
     runtime.stop()
     assert captures[0].released
     assert processors[0].closed
+
+
+def test_failed_attempt_releases_resources_before_a_fresh_retry() -> None:
+    app = _APP
+    captures: list[_Capture] = []
+    processors: list[_Processor] = []
+
+    def capture_factory(_index: int) -> _Capture:
+        capture = _Capture()
+        captures.append(capture)
+        return capture
+
+    def processor_factory(mode: DesktopMode) -> _Processor:
+        processor: _Processor = (
+            _FailingProcessor(mode) if not processors else _CompletingProcessor(mode)
+        )
+        processors.append(processor)
+        return processor
+
+    runtime = DesktopRuntime(
+        processor_factory,
+        capture_factory=capture_factory,
+        capture_interval_ms=2,
+        inference_interval_ms=10,
+    )
+
+    runtime.start(DesktopMode.REGISTRATION)
+    _wait_until(app, lambda: runtime.lifecycle.status is RuntimeStatus.FAILED)
+    _wait_until(app, lambda: captures[0].released and processors[0].closed)
+
+    runtime.start(DesktopMode.REGISTRATION)
+    _wait_until(app, lambda: runtime.lifecycle.status is RuntimeStatus.COMPLETED)
+    _wait_until(app, lambda: captures[1].released and processors[1].closed)
+
+    assert runtime.frame_buffer.take(now_ns=time.monotonic_ns(), max_age_ns=1) is None
 
 
 def test_slow_inference_does_not_block_the_gui_event_loop() -> None:

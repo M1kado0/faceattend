@@ -6,15 +6,17 @@ from PySide6.QtCore import Slot
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QMainWindow, QStackedWidget
 
+from faceattend.application.local_composition import LocalApplication, RegistrationInput
 from faceattend.application.runtime import DesktopMode, RuntimeStatus
 from faceattend.gui.runtime import DesktopRuntime
 from faceattend.gui.views import AttendanceView, HomeView, RegistrationView, SessionView
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, runtime: DesktopRuntime) -> None:
+    def __init__(self, runtime: DesktopRuntime, application: LocalApplication) -> None:
         super().__init__()
         self.runtime = runtime
+        self.application = application
         self.setWindowTitle("FaceAttend")
         self.resize(900, 700)
         self.stack = QStackedWidget()
@@ -29,6 +31,9 @@ class MainWindow(QMainWindow):
         self.home.mode_requested.connect(self.start_mode)
         self.registration.cancel_requested.connect(self.cancel_session)
         self.attendance.cancel_requested.connect(self.cancel_session)
+        self.registration.start_requested.connect(self.start_registration)
+        self.attendance.create_session_requested.connect(self.create_attendance_session)
+        self.attendance.start_requested.connect(self.start_attendance)
         self.runtime.preview_ready.connect(self._show_preview)
         self.runtime.presentation_ready.connect(self._show_presentation)
         self.runtime.status_changed.connect(self._show_runtime_status)
@@ -39,7 +44,32 @@ class MainWindow(QMainWindow):
         if not isinstance(mode, DesktopMode) or mode is DesktopMode.HOME:
             raise ValueError("invalid desktop mode")
         self.stack.setCurrentWidget(self._view_for(mode))
-        self.runtime.start(mode)
+        if mode is DesktopMode.ATTENDANCE:
+            self.attendance.set_sessions(self.application.repository.open_attendance_sessions())
+
+    @Slot(str, bool)
+    def start_registration(self, name: str, consent: bool) -> None:
+        try:
+            self.application.configure_registration(RegistrationInput(name, consent))
+            self.runtime.start(DesktopMode.REGISTRATION)
+        except (RuntimeError, ValueError) as exc:
+            self.registration.status_label.setText(str(exc))
+
+    @Slot(str)
+    def create_attendance_session(self, name: str) -> None:
+        try:
+            self.application.create_attendance_session(name)
+            self.attendance.set_sessions(self.application.repository.open_attendance_sessions())
+        except (RuntimeError, ValueError) as exc:
+            self.attendance.status_label.setText(str(exc))
+
+    @Slot(str)
+    def start_attendance(self, session_id: str) -> None:
+        try:
+            self.application.configure_attendance(session_id)
+            self.runtime.start(DesktopMode.ATTENDANCE)
+        except (RuntimeError, ValueError) as exc:
+            self.attendance.status_label.setText(str(exc))
 
     @Slot()
     def cancel_session(self) -> None:
@@ -64,7 +94,13 @@ class MainWindow(QMainWindow):
             RuntimeStatus.FAILED,
         }:
             view = self._current_session_view()
-            view.status_label.setText(str(getattr(status, "value", status)).replace("_", " "))
+            # A terminal presentation has already supplied a precise reason such
+            # as ``active_failed`` or ``template_extraction_failed``.  Keep that
+            # information visible instead of replacing it with the unhelpful
+            # generic word "failed".
+            reason = self.runtime.lifecycle.reason
+            text = reason or str(getattr(status, "value", status))
+            view.status_label.setText(text.replace("_", " "))
 
     @Slot(str)
     def _show_error(self, reason: str) -> None:

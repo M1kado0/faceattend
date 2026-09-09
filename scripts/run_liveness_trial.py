@@ -17,6 +17,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -92,7 +95,15 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument(
         "--presentation",
         required=True,
-        choices=("bona_fide", "print", "phone", "prerecorded_video"),
+        choices=(
+            "bona_fide",
+            "print",
+            "phone",
+            "prerecorded_video",
+            "fixed_challenge_replay",
+            "substitution",
+            "frozen_frame",
+        ),
     )
     parser.add_argument(
         "--split",
@@ -114,6 +125,18 @@ def _arguments() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--camera-index", type=int, default=0)
+    parser.add_argument(
+        "--camera-placement",
+        choices=("level", "above", "below", "unspecified"),
+        default="unspecified",
+        help="Physical camera placement for a condition breakdown; never identifies a person.",
+    )
+    parser.add_argument(
+        "--passive-threshold",
+        type=float,
+        default=0.85,
+        help="Explicit experiment setting, recorded only for this trial.",
+    )
     parser.add_argument("--models", type=Path, default=repo_root / "models")
     parser.add_argument("--max-frames", type=int, default=600)
     parser.add_argument(
@@ -124,6 +147,19 @@ def _arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _commit_hash() -> str | None:
+    """Return the local source revision when Git metadata is available."""
+    git = shutil.which("git")
+    if git is None:
+        return None
+    try:
+        return subprocess.check_output(  # noqa: S603 - executable resolved locally by shutil.which
+            [git, "rev-parse", "HEAD"], cwd=repo_root, text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
 def main() -> int:
     args = _arguments()
     if not args.consent:
@@ -131,6 +167,9 @@ def main() -> int:
         return 2
     if args.max_frames <= 0:
         print("ERROR: --max-frames must be positive")
+        return 2
+    if not 0.0 <= args.passive_threshold <= 1.0:
+        print("ERROR: --passive-threshold must be between zero and one")
         return 2
     manifest = _manifest(args.models)
     explicit_actions = tuple(ChallengeAction(value) for value in (args.challenge or ()))
@@ -150,7 +189,7 @@ def main() -> int:
         )
     else:
         challenge = ChallengeSession(ChallengeSessionConfig())
-    processor = create_face_analyzer(manifest)
+    processor = create_face_analyzer(manifest, passive_threshold=args.passive_threshold)
     started_ns = time.monotonic_ns()
     challenge.start(started_ns // 1_000_000 - 1)
     evaluator = ActiveLivenessChallengeEvaluator(session=challenge)
@@ -211,6 +250,33 @@ def main() -> int:
         "glasses_condition": args.glasses,
         "natural_movement": args.natural_movement,
         "camera_index": args.camera_index,
+        "camera_placement": args.camera_placement,
+        "source_commit": _commit_hash(),
+        "runtime": {
+            "python": sys.version.split()[0],
+            "platform": platform.platform(),
+            "machine": platform.machine(),
+            "random_source": (
+                "secrets.SystemRandom" if not explicit_actions else "fixed_test_sequence"
+            ),
+            "seed": None,
+        },
+        "configuration": {
+            "passive_threshold": args.passive_threshold,
+            "active": {
+                "challenge_pool": [action.value for action in challenge.config.challenge_pool],
+                "min_challenges": challenge.config.min_challenges,
+                "max_challenges": challenge.config.max_challenges,
+                "challenge_timeout_ms": challenge.config.challenge_timeout_ms,
+                "session_timeout_ms": challenge.config.session_timeout_ms,
+            },
+            "passive_window": {
+                "min_frames": runtime.passive.min_frames,
+                "max_frames": runtime.passive.max_frames,
+                "min_duration_ms": runtime.passive.min_duration_ns // 1_000_000,
+                "sample_interval_ms": runtime.passive.sample_interval_ns // 1_000_000,
+            },
+        },
         "model_checksums": {
             role: getattr(manifest, role).metadata.checksum
             for role in ("detector", "embedding", "passive", "landmarker")

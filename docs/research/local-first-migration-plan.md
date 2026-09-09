@@ -2,7 +2,7 @@
 
 **Last reconciled:** 2026-09-08
 
-**Current phase:** Phase 6 — Attendance check-in application workflow
+**Current phase:** Phase 7 — Reproducible evaluation and threshold validation
 **Overall status:** PHASE 5 COMPLETED; PHASE 6 READY
 
 Target: PySide6 desktop UI + headless Python CV/application core + SQLite +
@@ -39,9 +39,10 @@ experiment or a passing synthetic test into measured security effectiveness.
 | 1 | Headless types, protocols, and workflow-state foundation | COMPLETED — foundation only |
 | 2 | CV adapters, frame evidence, randomized sessions, headless runtime | COMPLETED |
 | 3 | SQLite, audit persistence, exact local matcher | COMPLETED |
-| 4 | Qt shell, camera/inference concurrency, session presentation | COMPLETED |
-| 5 | Enrollment using the shared liveness runtime | COMPLETED |
-| 6 | Attendance using the shared liveness runtime and matcher | PENDING |
+| 4 | Qt shell, camera/inference concurrency, session presentation | COMPLETED — shell only |
+| 5 | Headless enrollment using the shared liveness runtime | COMPLETED |
+| 6 | Headless attendance using the shared liveness runtime and matcher | COMPLETED |
+| 6.5 | Compose the real interactive desktop application | COMPLETED — real-camera workflow and terminal outcomes exercised |
 | 7 | Reproducible recognition, liveness, and runtime evaluation | PENDING — pose diagnostics already exist |
 | 8 | Parity, packaging, and portfolio evidence | PENDING |
 | 9 | Approved retirement of obsolete infrastructure | DEFERRED — approval required |
@@ -523,24 +524,131 @@ Pose diversity remains an enrollment concern without requiring that animation.
 
 ## Phase 6 — Attendance check-in application workflow
 
-**Status: PENDING**
+**Status: COMPLETED**
 
-- [ ] Reuse the same mandatory active → passive runtime for explicit session check-in.
-- [ ] Extract embeddings only after both passes; match registered consenting,
+- [x] Reuse the same mandatory active → passive runtime for explicit session check-in.
+- [x] Extract embeddings only after both passes; match registered consenting,
       model-compatible identities using the approved calibrated policy.
-- [ ] Reject unknown and ambiguous identities before any attendance write.
-- [ ] Enforce duplicate handling in the database and return explicit outcomes.
-- [ ] Write check-in and required audit events with transaction/failure handling.
-- [ ] Integration-test all terminal outcomes, including no/multiple faces,
+- [x] Reject unknown and ambiguous identities before any attendance write.
+- [x] Enforce duplicate handling in the database and return explicit outcomes.
+- [x] Write check-in and required audit events with transaction/failure handling.
+- [x] Integration-test all terminal outcomes, including no/multiple faces,
       continuity loss, liveness failure, unknown/ambiguous/duplicate, and camera,
       model, or database failure.
 
-Existing `application/states.py` rejection transitions remain useful tests, but
-the local matcher and persistence services still need implementation.
+### 2026-09-08 — Phase 6 — Headless attendance workflow completed
+
+- Outcome: added a headless attendance coordinator and desktop-session adapter.
+  Explicit check-in reuses the active-challenge then temporal-PAD runtime;
+  embedding and matching cannot run before both liveness stages pass.
+- Matching: only active-consent templates with the exact configured embedding
+  model name, version, and checksum are loaded. Unknown and ambiguous matches
+  are terminal and never create attendance.
+- Persistence: passed liveness, idempotent attendance insertion, and sanitized
+  audits commit in one SQLite transaction. Rejected attempts are audited without
+  raw frames or embeddings; database failure rolls back the entire write.
+- Verification: 289 tests passed; `mypy src` passed for 41 source files; Ruff
+  and `git diff --check` passed. Existing third-party warnings remain.
+- Limitation: the desktop launcher still has an unconfigured real-runtime
+  factory. Recognition thresholds remain provisional until Phase 7 calibration.
+- Next gate: run held-out recognition, liveness, PAD, and runtime evaluation.
+
+## Phase 6.5 — Real desktop application composition
+
+**Status: COMPLETED — real-camera workflow and terminal outcomes exercised**
+
+This phase turns the completed Qt shell and headless registration/attendance
+services into one usable local application. Phase 4 established the desktop
+infrastructure; Phases 5 and 6 completed the headless workflows. The desktop
+launcher now connects them through a worker-owned real-model factory; the
+remaining gate is physical-camera validation.
+
+- [x] Add local application configuration for the SQLite path, model artifacts,
+      model checksums, thresholds, camera index, and runtime settings.
+- [x] Build one pinned real-runtime factory that loads and owns the detector,
+      MediaPipe landmarker, passive PAD model, aligner, and embedder.
+- [x] Make the camera index configurable and verify camera index `1` on the
+      current development machine without making it a universal default.
+- [x] Connect the registration view to explicit consent and person details,
+      then create a real `RegistrationCoordinator` using the shared liveness
+      runtime and local repository.
+- [x] Connect the attendance view to attendance-session selection, then create
+      a real `AttendanceCoordinator` using the same runtime, matcher, and
+      repository boundaries.
+- [x] Add the minimum person-management and attendance-session controls needed
+      to register a person and perform an explicit check-in locally.
+- [x] Present active challenge instructions, neutral/PAD guidance, success,
+      duplicate, unknown, ambiguous, cancellation, camera/model/database, and
+      liveness failure outcomes from structured application results.
+- [x] Keep model inference off the Qt main thread and preserve capacity-one
+      newest-frame backpressure, separate preview/inference rates, and exclusive
+      camera/model ownership.
+- [x] Ensure cancellation, retry, mode changes, and shutdown clear temporary
+      frames, close native model resources, release the camera, and leave SQLite
+      transactions consistent. Automated evidence covers cancellation, terminal
+      failure → fresh retry, registration/attendance mode switching, shutdown,
+      camera/model startup failure, capacity-one buffer cleanup, and SQLite
+      rollback. A user must still observe these paths on the physical device.
+- [x] Run a consented real-webcam registration, restart the application, reload
+      compatible templates, and complete a real-webcam attendance check-in.
+- [x] Test duplicate, unknown, ambiguous, failed-liveness, no/multiple-face,
+      camera-unavailable, model-unavailable, and database-failure behavior
+      through the composed desktop path.
+- [x] Keep the headless core independently runnable and ensure the complete
+      automated suite, Ruff, mypy, and shutdown/start-stop tests remain green.
+
+### Completion gate
+
+Do not mark Phase 6.5 complete until a user can launch `scripts/run_desktop.py`,
+register a consenting person with the real camera and models, restart the app,
+and successfully check that person into a selected attendance session. No REST
+API, WebSocket, browser frontend, or fake GUI progress may be required.
+
+### 2026-09-09 — Phase 6.5 — Lifecycle/retry verification
+
+- Outcome: terminal desktop failure now releases its capture and inference
+  workers before a fresh attempt starts; the UI also reports an early retry
+  request as a normal status message rather than throwing from a Qt slot.
+- Tests/checks: focused lifecycle, registration, attendance, and persistence
+  tests: **33 passed**; `ruff check .` passed; `mypy src` passed for 43 source
+  files. This is automated synthetic/fake-camera evidence, not a physical
+  webcam result.
+- Coverage: direct coordinator tests cover no/multiple face, liveness failure,
+  unknown, ambiguous, duplicate, and database rollback. Qt runtime tests cover
+  camera/model startup failure, cancellation, shutdown, bounded-frame cleanup,
+  and a terminal failure followed by a fresh retry.
+- Remaining gate: perform the consented desktop registration → application
+  restart → attendance check-in with camera index 1, then manually exercise
+  the remaining terminal screens. Do not retain raw frames while doing so.
+
+### 2026-09-09 — Phase 6.5 — Primary real-camera workflow passed
+
+- Measured project result: the operator successfully registered a consenting
+  person with the local PySide6 application, closed and restarted it, and then
+  completed a real-camera attendance check-in using the reloaded compatible
+  template. A second check-in returned the explicit duplicate outcome: `Already
+  checked in`.
+- Privacy: this report records only the workflow outcome. No raw frames,
+  landmarks, embeddings, identity name, or database contents were added to
+  documentation or Graphify.
+- Limitation: this is a one-person, one-device functional smoke result. It does
+  not calibrate recognition/PAD thresholds or establish liveness security.
+
+### 2026-09-09 — Phase 6.5 — Terminal desktop outcomes exercised
+
+- Measured project result: the operator manually exercised duplicate, unknown,
+  ambiguous, failed-liveness, no-face, multiple-face, unavailable-camera,
+  unavailable-model, and database-failure paths through the composed desktop
+  application.
+- Result interpretation: this closes the functional Phase 6.5 acceptance gate.
+  It confirms explicit terminal handling, not statistical recognition accuracy,
+  PAD accuracy, or presentation-attack resistance.
+- Privacy: no biometric payloads, screenshots, or identity information were
+  added to the project record.
 
 ## Phase 7 — Reproducible evaluation and threshold validation
 
-**Status: IN_PROGRESS — metrics-only trial protocol/harness exists; physical trials remain**
+**Status: DEFERRED — owner chose not to perform the remaining empirical evaluation**
 
 Develop the following tooling as needed during Phase 2, but track each result
 here. Formal final evaluation follows integration of the application workflows.
@@ -553,24 +661,33 @@ here. Formal final evaluation follows integration of the application workflows.
 - [x] Define trial manifests, consent/retention rules, condition/attack labels,
       participant/session-disjoint splits where applicable, and a diagnostic mode
       that cannot record attendance.
-- [ ] Capture repeated bona-fide attempts across lighting, distance, glasses,
-      camera placement, and natural movement.
-- [ ] Collect print, phone/display replay, prerecorded/fixed-challenge replay,
-      substitution, and frozen-frame trials; document unevaluated attack types.
-- [ ] Measure active completion, false-failure and timeout rates, wrong-direction/
-      dwell failures, completion latency, and attack acceptance with denominators.
-- [ ] Evaluate temporal PAD APCER per attack type, BPCER, compatible ACER,
-      failure-to-process, cross-camera/domain behavior, and window-policy effects.
-- [ ] Compare MiniFASNet with at least one reproducible lightweight alternative
-      as required by ADR-001; check licensing, preprocessing, and CPU cost.
-- [ ] Calibrate on validation data; freeze thresholds/configuration and evaluate
-      fresh held-out trials. Report uncertainty and sample-size limitations.
-- [ ] Evaluate recognition score distributions, ROC/DET, FMR/FNMR, EER, rank-1,
-      unknown rejection, ambiguity, template aggregation, and condition breakdowns.
-- [ ] Measure FPS, stale/dropped frames, p50/p95/p99 stage latency, cold/warm
-      startup, memory, CPU, and registration/check-in time.
-- [ ] Record hardware/camera, model hashes, configuration, thresholds, dataset/
-      split, seeds, and commit for every result; keep raw recordings local-only.
+- [x] Add aggregate-only liveness/PAD metric summaries, validation-only
+      threshold candidate reporting, and score-only verification operating-point
+      helpers. These tools cannot apply thresholds or access raw biometric data.
+- [x] Record per-trial provenance in the local JSONL runner: source commit,
+      platform, camera index/placement, model hashes, and active/PAD window
+      configuration. Raw frames and templates remain in memory only.
+- [x] Document OpenVINO anti-spoof-mn3 as a reproducible comparison candidate;
+      it is not downloaded, evaluated, or adopted without explicit approval.
+- [-] DEFERRED — do not collect repeated bona-fide trials across lighting,
+      distance, glasses, camera placement, or natural movement in current scope.
+- [-] DEFERRED — do not collect print, phone/display replay, prerecorded/fixed-
+      challenge replay, substitution, or frozen-frame trials in current scope.
+- [-] DEFERRED — do not report active completion, false-failure, timeout,
+      wrong-direction/dwell, latency, or attack-acceptance rates as final results.
+- [-] DEFERRED — do not report PAD APCER, BPCER, ACER, FTO, cross-camera/domain,
+      or window-policy results as final evaluation evidence.
+- [-] DEFERRED — retain MiniFASNetV2 as the sole passive-PAD baseline for this
+      project scope. Do not download, integrate, or benchmark another PAD model
+      unless the owner reopens this decision; see ADR-002.
+- [-] DEFERRED — do not calibrate/freeze thresholds or run validation/held-out
+      evaluation. The current configured thresholds remain unvalidated baselines.
+- [-] DEFERRED — do not collect recognition score distributions or report
+      ROC/DET, FMR/FNMR, EER, rank-1, unknown/ambiguity, or aggregation results.
+- [-] DEFERRED — do not benchmark FPS, dropped/stale frames, stage latency,
+      startup, memory, CPU, or workflow time as project performance results.
+- [-] DEFERRED — no new formal experimental record is required while Phase 7 is
+      deferred. Existing local-only metrics retain their original provenance.
 - [x] Verify debug scripts and local output paths follow retention/ignore policy:
       root pose CSVs are explicitly ignored, pipeline images default to the OS
       temporary directory, and liveness trials default to an ignored local folder.
@@ -578,11 +695,51 @@ here. Formal final evaluation follows integration of the application workflows.
 The executable local protocol is documented in
 `docs/research/liveness-trial-protocol.md`; `scripts/run_liveness_trial.py`
 records aggregate metrics and model checksums without an attendance-writing path.
-Physical trials and threshold promotion remain unchecked until measured.
+The tooling and local protocol are retained for future use, but no additional
+Phase 7 trial is required in the current project scope. See ADR-003.
+
+### 2026-09-09 — Phase 7 — PAD comparison deferred
+
+- Project decision: retain the existing MiniFASNetV2 baseline and defer the
+  alternative lightweight-PAD comparison. This is a scope decision, not a
+  measured conclusion that MiniFASNetV2 is superior.
+- Consequence: Phase 7 must not claim model-selection evidence or state of the
+  art. The remaining evaluation tasks stay open if the project later needs PAD
+  effectiveness claims.
+
+### 2026-09-09 — Phase 7 — Empirical evaluation deferred
+
+- Project decision: defer all remaining real-camera, presentation-attack,
+  recognition, calibration, and runtime-benchmark work. Preserve the existing
+  scripts, local-only data policy, and exploratory aggregate for future work.
+- Consequence: FaceAttend may be demonstrated as a local CV prototype with
+  liveness gates, but must not claim calibrated recognition accuracy, PAD
+  accuracy, replay resistance, attack-detection effectiveness, benchmarked
+  latency/FPS, or production-grade biometric security.
 
 The prior 0.924292 PAD score at threshold 0.85 was one genuine smoke window,
 not a calibrated threshold or proof of attack resistance. Pose estimator
 disagreement must not be reported as ground-truth head-pose error.
+
+### 2026-09-09 — Phase 7 — Proposal-only liveness aggregate
+
+- Measured project result: 34 consented, aggregate-only bona-fide proposal
+  trials were found in the ignored local trial ledger. All used normal lighting,
+  normal distance, no glasses, and no documented placement; 32/34 used no
+  natural-movement condition. They are therefore **not** a condition-robust
+  validation set.
+- Active completion was 22/34 (64.7%; Wilson 95% interval 47.9–78.5%). Four
+  sessions timed out; recorded active failure reasons also included four
+  `face_missing_too_long` and three `multiple_faces` outcomes.
+- Overall bona-fide rejection was 20/34 (58.8%; 42.2–73.6%). Of the 22 trials
+  that produced a PAD score, 8 were below the baseline 0.85 threshold: BPCER
+  8/22 (36.4%; 19.7–57.0%). Twelve trials had a PAD failure-to-process event.
+  End-to-end duration was p50 3.72 s, p95 9.01 s, p99 12.64 s.
+- Interpretation: these values identify calibration/reliability work; they do
+  not establish PAD accuracy or liveness security. No attack trial, validation
+  split, test split, alternative-model comparison, recognition-score dataset,
+  CPU/memory/FPS benchmark, or threshold freeze exists yet. Keep every Phase 7
+  physical-evaluation checkbox open.
 
 ## Phase 8 — Parity, packaging, and portfolio evidence
 

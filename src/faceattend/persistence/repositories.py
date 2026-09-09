@@ -401,11 +401,170 @@ class LocalRepository:
                 "t.pose_bin, t.quality_json, t.created_at, m.name, m.version, m.checksum, "
                 "t.pose_json "
                 "FROM embedding_templates AS t JOIN model_versions AS m "
-                "ON m.id = t.model_version_id WHERE m.role = 'embedding' AND m.name = ? "
+                "ON m.id = t.model_version_id JOIN people AS p ON p.id = t.person_id "
+                "WHERE p.deleted_at IS NULL AND EXISTS (SELECT 1 FROM consent_records AS c "
+                "WHERE c.person_id = p.id AND c.withdrawn_at IS NULL) "
+                "AND m.role = 'embedding' AND m.name = ? "
                 "AND m.version = ? AND m.checksum = ? ORDER BY t.created_at, t.id",
                 (model.name, model.version, model.checksum),
             ).fetchall()
         return tuple(_template_from_row(row) for row in rows)
+
+    def record_check_in_rejection(
+        self,
+        attempt: LivenessAttempt,
+        *,
+        outcome: str,
+        actor_id: str,
+        match_score: float | None = None,
+        match_threshold: float | None = None,
+        ambiguity_margin: float | None = None,
+    ) -> None:
+        """Atomically retain a sanitized failed/unknown/ambiguous check-in decision."""
+        if outcome not in {"failed", "unknown", "ambiguous"}:
+            raise PersistenceError("invalid rejected check-in outcome")
+        if attempt.operation != "check_in" or attempt.person_id is not None:
+            raise PersistenceError("rejected check-in must not assert an identity")
+        metadata: dict[str, Any] = {
+            "liveness_attempt_id": attempt.attempt_id,
+            "configuration_version_id": attempt.configuration_version_id,
+            "outcome": outcome,
+            "failure_reason": attempt.failure_reason,
+        }
+        if match_score is not None:
+            metadata.update(
+                match_score=match_score,
+                match_threshold=match_threshold,
+                ambiguity_margin=ambiguity_margin,
+            )
+        with self.database.transaction() as connection:
+            self._insert_liveness(connection, attempt)
+            self._audit(
+                connection,
+                actor_id=actor_id,
+                action="liveness.attempt",
+                target_id=None,
+                metadata=_liveness_audit_metadata(attempt),
+                created_at=attempt.created_at,
+            )
+            self._audit(
+                connection,
+                actor_id=actor_id,
+                action=f"check_in.{outcome}",
+                target_id=None,
+                metadata=metadata,
+                created_at=attempt.created_at,
+            )
+
+    def record_check_in_atomically(
+        self,
+        attendance_session_id: str,
+        person_id: str,
+        *,
+        attempt: LivenessAttempt,
+        match_score: float,
+        match_threshold: float,
+        ambiguity_margin: float,
+        actor_id: str,
+        checked_in_at: datetime,
+    ) -> AttendanceWrite:
+        """Commit passed liveness, attendance, and audits as one transaction."""
+        if (
+            attempt.operation != "check_in"
+            or attempt.person_id != person_id
+            or attempt.active_decision != "passed"
+            or attempt.passive_decision != "passed"
+            or attempt.failure_reason is not None
+        ):
+            raise PersistenceError("attendance requires passed check-in liveness")
+        values = (match_score, match_threshold, ambiguity_margin)
+        if not all(np.isfinite(value) for value in values):
+            raise PersistenceError("attendance match values must be finite")
+        proposed_id = str(uuid4())
+        with self.database.transaction() as connection:
+            active_consent = connection.execute(
+                "SELECT 1 FROM people AS p WHERE p.id = ? AND p.deleted_at IS NULL "
+                "AND EXISTS (SELECT 1 FROM consent_records AS c WHERE c.person_id = p.id "
+                "AND c.withdrawn_at IS NULL)",
+                (person_id,),
+            ).fetchone()
+            session = connection.execute(
+                "SELECT 1 FROM attendance_sessions WHERE id = ? AND closed_at IS NULL",
+                (attendance_session_id,),
+            ).fetchone()
+            if active_consent is None or session is None:
+                raise PersistenceError("active session and attendance consent are required")
+            self._insert_liveness(connection, attempt)
+            self._audit(
+                connection,
+                actor_id=actor_id,
+                action="liveness.attempt",
+                target_id=person_id,
+                metadata=_liveness_audit_metadata(attempt),
+                created_at=checked_in_at,
+            )
+            cursor = connection.execute(
+                "INSERT INTO attendance_records(id, attendance_session_id, person_id, "
+                "liveness_attempt_id, checked_in_at, match_score, match_threshold, "
+                "ambiguity_margin, configuration_version_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(attendance_session_id, person_id) DO NOTHING",
+                (
+                    proposed_id,
+                    attendance_session_id,
+                    person_id,
+                    attempt.attempt_id,
+                    _timestamp(checked_in_at),
+                    match_score,
+                    match_threshold,
+                    ambiguity_margin,
+                    attempt.configuration_version_id,
+                ),
+            )
+            duplicate = cursor.rowcount == 0
+            if duplicate:
+                row = connection.execute(
+                    "SELECT id FROM attendance_records WHERE attendance_session_id = ? "
+                    "AND person_id = ?",
+                    (attendance_session_id, person_id),
+                ).fetchone()
+                assert row is not None
+                record_id = str(row[0])
+            else:
+                record_id = proposed_id
+            self._audit(
+                connection,
+                actor_id=actor_id,
+                action="attendance.duplicate" if duplicate else "attendance.recorded",
+                target_id=person_id,
+                metadata={
+                    "attendance_record_id": record_id,
+                    "attendance_session_id": attendance_session_id,
+                    "liveness_attempt_id": attempt.attempt_id,
+                    "configuration_version_id": attempt.configuration_version_id,
+                    "match_score": match_score,
+                    "match_threshold": match_threshold,
+                    "ambiguity_margin": ambiguity_margin,
+                },
+                created_at=checked_in_at,
+            )
+        return AttendanceWrite(record_id, duplicate)
+
+    def attendance_count(self) -> int:
+        with self.database.connection() as connection:
+            return int(connection.execute("SELECT COUNT(*) FROM attendance_records").fetchone()[0])
+
+    @staticmethod
+    def _insert_liveness(connection: sqlite3.Connection, attempt: LivenessAttempt) -> None:
+        if attempt.suspicious_frame_count < 0 or attempt.processing_failure_count < 0:
+            raise PersistenceError("liveness counts must be non-negative")
+        connection.execute(
+            "INSERT INTO liveness_attempts(id, person_id, operation, challenge_sequence_json, "
+            "completed_challenges_json, active_decision, passive_decision, failure_reason, "
+            "passive_median, passive_minimum, suspicious_frame_count, processing_failure_count, "
+            "configuration_version_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            _liveness_values(attempt),
+        )
 
     def audit_actions(self) -> tuple[str, ...]:
         with self.database.connection() as connection:
@@ -480,6 +639,14 @@ class LocalRepository:
                 created_at=opened_at,
             )
         return session_id
+
+    def open_attendance_sessions(self) -> tuple[tuple[str, str], ...]:
+        with self.database.connection() as connection:
+            rows = connection.execute(
+                "SELECT id, name FROM attendance_sessions WHERE closed_at IS NULL "
+                "ORDER BY opened_at DESC, id DESC"
+            ).fetchall()
+        return tuple((str(row[0]), str(row[1])) for row in rows)
 
     def record_attendance(
         self,
