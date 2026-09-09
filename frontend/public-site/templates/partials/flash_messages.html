@@ -1,7 +1,0 @@
-{% if flash_messages %}
-    {% for category, message in flash_messages %}
-    <div role="alert" class="alert alert-{{ category }} mb-4">
-        <span>{{ message }}</span>
-    </div>
-    {% endfor %}
-{% endif %}

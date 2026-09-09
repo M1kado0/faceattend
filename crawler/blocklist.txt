@@ -1,4 +1,0 @@
-# Domains we will never crawl. One per line. Comments start with #.
-# Rationale for each entry must be recorded in docs/legal/blocklist-decisions.md.
-# Categories: revenge-porn / doxxing sites, children's content platforms,
-# anything where minors are the primary subject.
