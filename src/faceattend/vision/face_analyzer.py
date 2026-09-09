@@ -141,12 +141,14 @@ class MediaPipeFrameLandmarker:
 
     def action(self, result: Any, timestamp_ms: int) -> Any:
         if self._actions is None:
-            self._actions = import_module("ml.liveness.mediapipe_active").MediaPipeActionEvidence()
+            self._actions = import_module(
+                "faceattend.vision.mediapipe_runtime"
+            ).MediaPipeActionEvidence()
         return self._actions.observe(result, timestamp_ms)
 
     def smile_score(self, result: Any) -> float:
         """Expose raw expression evidence without coupling core types to MediaPipe."""
-        module = import_module("ml.liveness.mediapipe_active")
+        module = import_module("faceattend.vision.mediapipe_runtime")
         return float(module.mediapipe_smile_score(result))
 
     def reset_actions(self) -> None:

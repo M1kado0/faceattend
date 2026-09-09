@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from importlib import import_module
 from typing import Any, cast
 
 from faceattend.application.attendance_service import AttendanceCoordinator, AttendanceRequest
@@ -19,6 +18,7 @@ from faceattend.vision.active_liveness import ActiveLivenessChallengeEvaluator
 from faceattend.vision.challenge_session import ChallengeSession
 from faceattend.vision.face_analyzer import HeadlessFaceAnalyzer, create_face_analyzer
 from faceattend.vision.matcher import ExactNumpyMatcher
+from faceattend.vision.mediapipe_runtime import MediaPipeLivenessSession
 from faceattend.vision.passive_liveness import (
     MiniFASNetPassiveLivenessDetector,
     TemporalPassiveLivenessSession,
@@ -49,11 +49,9 @@ class _DeferredLivenessSession:
             # normal first frame is incorrectly rejected as non-monotonic.
             challenge.start(_start_before_first_frame(frame.captured_at_ns))
             evaluator = ActiveLivenessChallengeEvaluator(session=challenge)
-            runtime_module: Any = import_module("ml.liveness.mediapipe_active")
-            runtime_class: Any = runtime_module.MediaPipeLivenessSession
             if not isinstance(self.analyzer.passive, MiniFASNetPassiveLivenessDetector):
                 raise RuntimeError("local runtime requires the MiniFASNet adapter")
-            self._session = runtime_class(
+            self._session = MediaPipeLivenessSession(
                 evaluator,
                 TemporalPassiveLivenessSession(self.analyzer.passive),
                 processor=self.analyzer,

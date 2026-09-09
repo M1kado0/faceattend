@@ -1,7 +1,7 @@
 """Validated, framework-independent head-pose estimators.
 
-The legacy ``ml.liveness.head_pose`` module remains in place for compatibility.
-New workflows should use these estimators and their explicit conventions.
+These estimators provide the explicit conventions used by the local desktop
+workflow.
 """
 
 from __future__ import annotations

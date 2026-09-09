@@ -179,8 +179,8 @@ class MiniFASNetPassiveLivenessDetector:
                 return model_loader()
             # Import lazily so this headless boundary does not load ONNX Runtime
             # until the detector is actually used.
-            minifasnet_module = import_module("ml.liveness.minifasnet")
-            return minifasnet_module.MiniFASNet(model_path, scale=scale)
+            minifasnet_module = import_module("faceattend.vision.minifasnet_model")
+            return minifasnet_module.MiniFASNetModel(model_path, scale=scale)
 
         self._model = LazyModel(load)
 
