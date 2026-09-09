@@ -183,3 +183,9 @@ images
 .mcp.json
 
 .agents
+
+docs
+graphify-out
+scripts
+tests
+A
