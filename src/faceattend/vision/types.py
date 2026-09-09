@@ -182,6 +182,7 @@ class MatchDecision:
 
 class RegistrationStatus(StrEnum):
     COMPLETED = "completed"
+    DUPLICATE = "duplicate"
     FAILED = "failed"
     CANCELLED = "cancelled"
 

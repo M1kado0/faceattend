@@ -1,7 +1,7 @@
 [project]
 name = "faceattend"
 version = "0.1.0"
-description = "Find where your face appears across the public internet, request takedowns."
+description = "Local-first desktop face-attendance CV prototype."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
@@ -51,6 +51,13 @@ dependencies = [
     "mediapipe>=0.10.35",
     "pyside6-essentials>=6.8,<7",
 ]
+
+[project.scripts]
+faceattend = "faceattend.gui.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project.optional-dependencies]
 ml = [

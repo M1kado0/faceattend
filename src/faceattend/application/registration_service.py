@@ -13,6 +13,7 @@ import numpy as np
 
 from faceattend.persistence.records import LivenessAttempt
 from faceattend.persistence.repositories import LocalRepository
+from faceattend.vision.matcher import ExactNumpyMatcher
 from faceattend.vision.types import (
     EmbeddingTemplate,
     EvidenceDecision,
@@ -21,6 +22,8 @@ from faceattend.vision.types import (
     HeadPose,
     LivenessEvidence,
     LivenessKind,
+    MatchDecision,
+    MatchStatus,
     ModelMetadata,
     RegistrationResult,
     RegistrationStatus,
@@ -62,6 +65,14 @@ class EnrollmentFaceAnalyzer(Protocol):
     ) -> np.ndarray: ...
 
 
+class RegistrationMatcher(Protocol):
+    """The local matcher boundary used to block likely duplicate enrollment."""
+
+    def rebuild(self, templates: Sequence[EmbeddingTemplate]) -> None: ...
+
+    def match(self, embedding: np.ndarray) -> MatchDecision: ...
+
+
 @dataclass(frozen=True, slots=True)
 class RegistrationRequest:
     display_name: str
@@ -83,12 +94,16 @@ class RegistrationCoordinator:
         *,
         session: EnrollmentSession,
         face_analyzer: EnrollmentFaceAnalyzer,
+        matcher: RegistrationMatcher | None = None,
         repository: LocalRepository,
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self.request = request
         self.session = session
         self.face_analyzer = face_analyzer
+        # This is intentionally the same policy shape as local check-in. Its
+        # numeric values remain provisional while Phase 7 is deferred.
+        self.matcher = matcher or ExactNumpyMatcher(match_threshold=0.75, ambiguity_margin=0.05)
         self.repository = repository
         self.now = now or (lambda: datetime.now(UTC))
         self.person_id = str(uuid4())
@@ -163,6 +178,17 @@ class RegistrationCoordinator:
             return self._fail("template_extraction_failed")
 
         try:
+            self.matcher.rebuild(self.repository.load_compatible_templates(self.request.embedding_model))
+            if any(
+                self.matcher.match(template.embedding).status
+                in {MatchStatus.MATCHED, MatchStatus.AMBIGUOUS}
+                for template in templates
+            ):
+                return self._block_duplicate(completed_at)
+        except (ValueError, TypeError, RuntimeError, OSError, sqlite3.Error):
+            return self._fail("duplicate_enrollment_check_failed")
+
+        try:
             # AUDIT: repository commits consent, liveness, templates, and audit
             # records together; any failure rolls the entire identity back.
             write = self.repository.register_person_atomically(
@@ -182,6 +208,35 @@ class RegistrationCoordinator:
             RegistrationStatus.COMPLETED,
             write.person_id,
             tuple(item.template_id for item in templates),
+        )
+        return self._result
+
+    def _block_duplicate(self, occurred_at: datetime) -> RegistrationResult:
+        """Reject a likely duplicate without disclosing the matched identity.
+
+        # PRIVACY: the audit intentionally has no target identity, match score,
+        # embedding, or template reference. The current policy is provisional,
+        # so this protects against simple duplicate enrollment but is not a
+        # calibrated identity-proofing guarantee.
+        """
+        try:
+            self.repository.record_audit(
+                actor_id=self.request.actor_id,
+                action="enrollment.duplicate_blocked",
+                target_id=None,
+                metadata={
+                    "outcome": "face_already_registered",
+                    "policy": "provisional_current_matching_policy",
+                },
+                created_at=occurred_at,
+            )
+        except (TypeError, ValueError, OSError, sqlite3.Error):
+            return self._fail("database_failure")
+        self.session.cancel()
+        self._result = RegistrationResult(
+            RegistrationStatus.DUPLICATE,
+            None,
+            reason="face_already_registered",
         )
         return self._result
 

@@ -158,6 +158,10 @@ class LocalApplication:
                 ),
                 session=session,
                 face_analyzer=analyzer,
+                matcher=ExactNumpyMatcher(
+                    match_threshold=self.config.match_threshold,
+                    ambiguity_margin=self.config.ambiguity_margin,
+                ),
                 repository=self.repository,
             )
             return RegistrationDesktopSessionProcessor(

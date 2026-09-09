@@ -41,6 +41,7 @@ class RegistrationDesktopSessionProcessor:
             return presentation
         status = {
             RegistrationStatus.COMPLETED: RuntimeStatus.COMPLETED,
+            RegistrationStatus.DUPLICATE: RuntimeStatus.FAILED,
             RegistrationStatus.FAILED: RuntimeStatus.FAILED,
             RegistrationStatus.CANCELLED: RuntimeStatus.CANCELLED,
         }[result.status]
@@ -51,7 +52,13 @@ class RegistrationDesktopSessionProcessor:
         return replace(
             presentation,
             status=status,
-            instruction=("Registration complete" if status is RuntimeStatus.COMPLETED else "Retry"),
+            instruction=(
+                "Registration complete"
+                if status is RuntimeStatus.COMPLETED
+                else "Face already registered"
+                if result.reason == "face_already_registered"
+                else "Retry"
+            ),
             failure_reason=failure_reason,
         )
 
