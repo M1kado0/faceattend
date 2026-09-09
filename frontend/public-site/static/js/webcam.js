@@ -17,6 +17,8 @@ const BLINK_CLOSED_THRESHOLD = 0.45;
 const BLINK_OPEN_THRESHOLD = 0.25;
 const MIN_FACE_HEIGHT_RATIO = 0.14;
 const CHALLENGE_COUNTDOWN_SECONDS = 3;
+const TURN_COUNTDOWN_SECONDS = 3;
+const TURN_PROMPT_DURATION_MS = 1400;
 const NO_FACE_MESSAGE = 'Position your face in the oval';
 const MOVE_CLOSER_MESSAGE = 'Move closer';
 
@@ -36,6 +38,7 @@ async function startLivenessCapture(targetUrl, onComplete, options = {}) {
     let recorder = null;
     let recordingTimeoutId = null;
     let recordingStarted = false;
+    let turnSequenceStarted = false;
     let countdownTimerId = null;
     let countdownActive = false;
     const chunks = [];
@@ -70,6 +73,7 @@ async function startLivenessCapture(targetUrl, onComplete, options = {}) {
         guidance.setPhase('blink', 'active');
         startRecording();
         guidance.show('Blink twice', 'active');
+        setTimeout(startTurnSequence, 2500);
         return;
     }
 
@@ -124,10 +128,7 @@ async function startLivenessCapture(targetUrl, onComplete, options = {}) {
         if (blinkCount >= 2) {
             guidance.setPhase('blink', 'done');
             guidance.show('Blink 2 detected', 'success');
-            setTimeout(() => {
-                if (!stopped) guidance.show('Challenge complete', 'success');
-                stopCapture();
-            }, 400);
+            startTurnSequence();
             return;
         }
 
@@ -195,6 +196,58 @@ async function startLivenessCapture(targetUrl, onComplete, options = {}) {
         recorder.start();
         recordingTimeoutId = setTimeout(stopCapture, durationMs);
         setResult(resultTarget, 'Recording challenge video...');
+    }
+
+    function startTurnSequence() {
+        if (turnSequenceStarted) return;
+        turnSequenceStarted = true;
+
+        runTurnCountdown({
+            phase: 'turn-left',
+            readyMessage: 'Get ready to turn left',
+            countdownMessage: 'Turn left in',
+            actionMessage: 'Turn head left',
+            onComplete: () => {
+                guidance.setPhase('turn-left', 'done');
+                runTurnCountdown({
+                    phase: 'turn-right',
+                    readyMessage: 'Get ready to turn right',
+                    countdownMessage: 'Turn right in',
+                    actionMessage: 'Turn head right',
+                    onComplete: () => {
+                        guidance.setPhase('turn-right', 'done');
+                        guidance.show('Challenge complete', 'success');
+                        stopCapture();
+                    },
+                });
+            },
+        });
+    }
+
+    function runTurnCountdown({ phase, readyMessage, countdownMessage, actionMessage, onComplete }) {
+        if (stopped) return;
+        guidance.setPhase(phase, 'active');
+        guidance.show(readyMessage, 'active');
+
+        let secondsLeft = TURN_COUNTDOWN_SECONDS;
+        const intervalId = setInterval(() => {
+            if (stopped) {
+                clearInterval(intervalId);
+                return;
+            }
+
+            if (secondsLeft > 0) {
+                guidance.show(`${countdownMessage} ${secondsLeft}`, 'active');
+                secondsLeft -= 1;
+                return;
+            }
+
+            clearInterval(intervalId);
+            guidance.show(actionMessage, 'active');
+            setTimeout(() => {
+                if (!stopped) onComplete();
+            }, TURN_PROMPT_DURATION_MS);
+        }, 1000);
     }
 
     async function uploadRecording() {

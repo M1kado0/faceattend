@@ -28,6 +28,15 @@ templates = Jinja2Templates(
 )
 
 
+def _backend_detail(exc: httpx.HTTPStatusError) -> str:
+    try:
+        data = exc.response.json()
+    except ValueError:
+        return exc.response.text
+    detail = data.get("detail")
+    return detail if isinstance(detail, str) else str(detail)
+
+
 @router.get("/check-in", response_class=HTMLResponse)
 async def check_in_page(request: Request):
     token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -45,6 +54,7 @@ async def check_in_page(request: Request):
         return templates.TemplateResponse(
             request=request,
             name="partials/check_in_error.html",
+            context={"message": f"Check-in failed: {_backend_detail(exc)}"},
         )
     except httpx.RequestError:
         return templates.TemplateResponse(
@@ -134,6 +144,7 @@ async def create_check_in(
         return templates.TemplateResponse(
             request=request,
             name="partials/check_in_error.html",
+            context={"message": f"Check-in failed: {_backend_detail(exc)}"},
         )
     except httpx.RequestError:
         return templates.TemplateResponse(

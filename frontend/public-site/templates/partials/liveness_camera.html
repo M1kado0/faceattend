@@ -20,9 +20,11 @@
                     Camera is idle
                 </div>
             </div>
-            <div id="liveness-phases" class="absolute inset-x-4 bottom-4 grid grid-cols-3 gap-2 text-center text-xs font-semibold">
+            <div id="liveness-phases" class="absolute inset-x-4 bottom-4 grid grid-cols-5 gap-2 text-center text-xs font-semibold">
                 <div data-liveness-phase="face" class="rounded-full bg-white/20 px-3 py-2 text-white/70 backdrop-blur">Face</div>
                 <div data-liveness-phase="blink" class="rounded-full bg-white/20 px-3 py-2 text-white/70 backdrop-blur">Blink</div>
+                <div data-liveness-phase="turn-left" class="rounded-full bg-white/20 px-3 py-2 text-white/70 backdrop-blur">Left</div>
+                <div data-liveness-phase="turn-right" class="rounded-full bg-white/20 px-3 py-2 text-white/70 backdrop-blur">Right</div>
                 <div data-liveness-phase="upload" class="rounded-full bg-white/20 px-3 py-2 text-white/70 backdrop-blur">Upload</div>
             </div>
         </div>
@@ -31,7 +33,7 @@
                 class="btn btn-primary w-full"
                 type="button"
                 {% if not can_start %}disabled{% endif %}
-                onclick="window.startLivenessCapture('{{ liveness_start_url }}', null, { fieldName: 'liveness_video', targetId: '{{ result_id }}', durationMs: 4000{% if session_select_id is defined %}, sessionSelectId: '{{ session_select_id }}'{% endif %} })"
+                onclick="window.startLivenessCapture('{{ liveness_start_url }}', null, { fieldName: 'liveness_video', targetId: '{{ result_id }}', durationMs: 14000{% if session_select_id is defined %}, sessionSelectId: '{{ session_select_id }}'{% endif %} })"
             >
                 {{ button_text }}
             </button>

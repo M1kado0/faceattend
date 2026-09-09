@@ -8,7 +8,7 @@ The MVP flow is intentionally small:
 ```text
 register a consenting face
 create an attendance session
-check in with blink-twice liveness
+check in with blink and head-turn liveness
 match the live face to the registered template
 record attendance
 export attendance as CSV
@@ -25,11 +25,11 @@ FaceAttend is built around explicit self check-ins.
 
 1. A user creates an account or logs in.
 2. The user registers their face with a short webcam video.
-3. The backend verifies active liveness with a blink-twice challenge.
+3. The backend verifies active liveness with a blink and head-turn challenge.
 4. The backend samples frames from that same video and checks passive liveness.
 5. The best live frame is embedded and stored in the vector index.
 6. The user creates an attendance session.
-7. The user checks in to that session with another blink-twice webcam video.
+7. The user checks in to that session with another webcam challenge video.
 8. The backend verifies liveness again, embeds the best live frames, and matches
    against the registered face template.
 9. Attendance is recorded only when liveness and identity match both pass.
@@ -44,7 +44,7 @@ Add real screenshots after running the local demo:
 
 | Step | Page | What to capture |
 |---|---|---|
-| 1 | `/face-registration` | Webcam oval, countdown, blink challenge |
+| 1 | `/face-registration` | Webcam oval, countdown, blink and head-turn challenge |
 | 2 | `/sessions` | Created attendance session |
 | 3 | `/check-in` | Session selector and liveness camera |
 | 4 | `/attendance` | Recorded check-in and confidence |
@@ -64,9 +64,9 @@ Short demo video outline:
 
 ```text
 0:00 Login
-0:05 Register face with blink twice
+0:05 Register face with blink, left-turn countdown, right-turn countdown
 0:20 Create attendance session
-0:30 Check in with blink twice
+0:30 Check in with blink, left-turn countdown, right-turn countdown
 0:45 Show attendance result
 0:55 Show duplicate check-in behavior
 1:05 Export CSV
@@ -90,7 +90,7 @@ AND identity_similarity >= 0.75
 Active liveness:
 
 - implemented with MediaPipe Face Landmarker
-- current challenge: `blink_twice`
+- current challenge: `blink_turn_left_right`
 - frontend gives live guidance only
 - backend is the source of truth
 
@@ -243,9 +243,9 @@ http://localhost:8000
 
 ```text
 /register or /login
-/face-registration -> register face with blink twice
+/face-registration -> register face with blink and turn countdowns
 /sessions -> create an attendance session
-/check-in -> select session and blink twice
+/check-in -> select session and complete the liveness challenge
 /attendance -> confirm record appears
 /attendance.csv -> confirm export works
 ```

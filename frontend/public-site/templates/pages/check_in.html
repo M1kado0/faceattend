@@ -7,7 +7,7 @@
     <div class="mb-6">
         <h1 class="text-3xl font-bold">Check in</h1>
         <p class="mt-2 text-base-content/70">
-            Verify liveness with a blink challenge before FaceAttend records attendance.
+            Verify liveness with blink and head-turn steps before FaceAttend records attendance.
         </p>
     </div>
 
@@ -25,7 +25,7 @@
 
     <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <section>
-            <h2 class="text-lg font-semibold">Blink challenge</h2>
+            <h2 class="text-lg font-semibold">Liveness challenge</h2>
             <p class="mt-2 text-sm text-base-content/70">
                 Record one short video. FaceAttend checks active liveness, passive liveness on sampled frames,
                 then matches a verified frame against your registered face template.
@@ -46,7 +46,7 @@
             </label>
 
             <div class="mt-5">
-                {% with liveness_start_url="/check-in", result_id="check-in-result", button_text="Blink twice and check in", can_start=has_registration and attendance_sessions, session_select_id="attendance-session-id" %}
+                {% with liveness_start_url="/check-in", result_id="check-in-result", button_text="Start liveness check-in", can_start=has_registration and attendance_sessions, session_select_id="attendance-session-id" %}
                     {% include "partials/liveness_camera.html" %}
                 {% endwith %}
             </div>
@@ -67,7 +67,7 @@
                 </div>
                 <div>
                     <dt class="font-medium text-base-content/70">Challenge</dt>
-                    <dd>blink_twice</dd>
+                    <dd>blink_twice, turn_left, turn_right</dd>
                 </div>
                 <div>
                     <dt class="font-medium text-base-content/70">Required checks</dt>
