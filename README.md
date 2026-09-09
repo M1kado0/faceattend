@@ -1,317 +1,191 @@
 # FaceAttend
 
-FaceAttend is a Python-first attendance system with webcam face registration,
-face recognition, and active/passive liveness checks.
+> A local-first desktop face-attendance prototype built to explore real-time
+> computer vision: face recognition, active liveness, passive presentation-attack
+> detection, and auditable local attendance records.
 
-The MVP flow is intentionally small:
+FaceAttend is a **PySide6 desktop application**. It runs on one local computer
+with a webcam, local model files, and a local SQLite database. It does **not**
+need a browser, backend server, REST API, WebSocket connection, Docker, or
+networked database.
 
-```text
-register a consenting face
-create an attendance session
-check in with blink and head-turn liveness
-match the live face to the registered template
-record attendance
-export attendance as CSV
-```
+## What it does
 
-No admin panel, no organizer mode, no background surveillance, no crawler, no
-public-web search, no takedown flow.
+### Enrollment
 
----
+1. The operator enters a person's name and records explicit consent.
+2. The person completes randomized active-liveness instructions, such as a
+   blink or a head movement.
+3. The person faces the camera and holds still while the application collects a
+   short neutral-frame window for passive liveness.
+4. When both liveness checks pass, FaceAttend selects 3–5 quality/pose-diverse
+   face templates and stores them locally.
+5. Likely duplicate enrollment is blocked with a generic message; it does not
+   disclose who may already be registered.
 
-## Current MVP
+### Attendance check-in
 
-FaceAttend is built around explicit self check-ins.
+1. The operator selects or creates an attendance session.
+2. The person completes the same active-liveness and neutral passive-liveness
+   sequence.
+3. Only then does FaceAttend create an embedding and search compatible,
+   consenting enrolled templates.
+4. It records attendance only for a confident, unambiguous match. Unknown,
+   ambiguous, duplicate, failed-liveness, no-face, and multiple-face outcomes
+   are explicit rejections.
 
-1. A user creates an account or logs in.
-2. The user registers their face with a short webcam video.
-3. The backend verifies active liveness with a blink and head-turn challenge.
-4. The backend samples frames from that same video and checks passive liveness.
-5. The best live frame is embedded and stored in the vector index.
-6. The user creates an attendance session.
-7. The user checks in to that session with another webcam challenge video.
-8. The backend verifies liveness again, embeds the best live frames, and matches
-   against the registered face template.
-9. Attendance is recorded only when liveness and identity match both pass.
+## Features
 
-Attendance is never recorded from a static uploaded image alone.
-
----
-
-## Screenshots / Demo Flow
-
-Add real screenshots after running the local demo:
-
-| Step | Page | What to capture |
-|---|---|---|
-| 1 | `/face-registration` | Webcam oval, countdown, blink and head-turn challenge |
-| 2 | `/sessions` | Created attendance session |
-| 3 | `/check-in` | Session selector and liveness camera |
-| 4 | `/attendance` | Recorded check-in and confidence |
-| 5 | `/attendance.csv` | CSV export downloaded/opened |
-
-Recommended files:
-
-```text
-docs/screenshots/01-face-registration.png
-docs/screenshots/02-sessions.png
-docs/screenshots/03-check-in.png
-docs/screenshots/04-attendance.png
-docs/screenshots/05-csv-export.png
-```
-
-Short demo video outline:
-
-```text
-0:00 Login
-0:05 Register face with blink, left-turn countdown, right-turn countdown
-0:20 Create attendance session
-0:30 Check in with blink, left-turn countdown, right-turn countdown
-0:45 Show attendance result
-0:55 Show duplicate check-in behavior
-1:05 Export CSV
-```
-
-Do not record or publish another person’s face without explicit consent.
-
----
-
-## Liveness Policy
-
-The current production-ish rule is:
-
-```text
-active_liveness_passed
-AND passive_liveness_pass_ratio >= 0.8
-AND face_visible_ratio >= 0.8
-AND identity_similarity >= 0.75
-```
-
-Active liveness:
-
-- implemented with MediaPipe Face Landmarker
-- current challenge: `blink_turn_left_right`
-- frontend gives live guidance only
-- backend is the source of truth
-
-Passive liveness:
-
-- samples frames from the webcam video
-- runs MiniFASNet-based passive spoof detection
-- uses the best live frames for embedding and matching
-
-Identity matching:
-
-- registration stores embeddings, not raw face crops
-- check-in searches the user’s registered face template
-- low-confidence or wrong-person matches do not record attendance
-- duplicate check-ins for the same session are idempotent
-
----
+- Local PySide6 interface with live camera preview and structured guidance.
+- MediaPipe landmarks, transformation-matrix head pose, blendshapes, blink
+  evidence, face-quality checks, and randomized active challenges.
+- MiniFASNetV2 temporal passive liveness over a short neutral-frame window.
+- InsightFace `buffalo_l` face detection, alignment, and normalized 512D face
+  embeddings.
+- SQLite records for people, consent, templates, sessions, check-ins, model and
+  configuration versions, liveness attempts, and audit events.
+- Exact NumPy cosine matching with model-compatibility filtering, unknown
+  rejection, ambiguity rejection, and duplicate check-in handling.
+- Headless CV and application layers separated from Qt GUI code.
+- A bounded latest-frame camera/inference pipeline to avoid stale-frame buildup.
 
 ## Architecture
 
 ```text
-┌────────────────────┐
-│   Frontend Site    │
-│ FastAPI + Jinja2   │
-│ HTMX + webcam JS   │
-└─────────┬──────────┘
-          │ HTTP
-          ▼
-┌────────────────────┐
-│    Backend API     │
-│ FastAPI + SQLModel │
-│ Auth, sessions,    │
-│ check-ins, audit   │
-└─────────┬──────────┘
-          │
-          ├──────────────┐
-          ▼              ▼
-┌─────────────────┐  ┌──────────────────┐
-│   ML Service    │  │   Vector Store    │
-│ face embedding, │  │ FAISS locally     │
-│ active/passive  │  │                  │
-│ liveness        │  │                  │
-└─────────────────┘  └──────────────────┘
-          │
-          ▼
-┌────────────────────┐
-│ PostgreSQL          │
-│ users, sessions,    │
-│ registrations,      │
-│ attendance records  │
-└────────────────────┘
+PySide6 desktop UI
+        |
+        v
+camera worker -> newest-frame buffer -> inference worker
+                                        |
+                                        v
+                              headless CV/application core
+                              - detection and quality checks
+                              - MediaPipe active liveness
+                              - MiniFASNetV2 passive liveness
+                              - alignment and embeddings
+                              - matching and workflow decisions
+                                        |
+                                        v
+                                      SQLite
 ```
 
----
+The GUI presents instructions and results. It never decides whether liveness
+has passed; those decisions come from the headless CV/application core.
 
-## Stack
+## Requirements
 
-| Layer | Tooling |
-|---|---|
-| Frontend | FastAPI, Jinja2, HTMX |
-| Styling | Tailwind CSS CDN, DaisyUI |
-| Webcam | Vanilla JavaScript in `frontend/public-site/static/js/webcam.js` |
-| Backend API | FastAPI |
-| ORM | SQLModel |
-| Database | PostgreSQL |
-| ML API | FastAPI |
-| Active liveness | MediaPipe Face Landmarker |
-| Passive liveness | MiniFASNet-style antispoofing |
-| Embeddings | ArcFace/AdaFace pipeline |
-| Vector search | FAISS locally |
-
----
-
-## Project Structure
+- Python 3.11+
+- A working webcam
+- [uv](https://docs.astral.sh/uv/)
+- The following local model artifacts in `models/`:
 
 ```text
-faceattend/
-├── backend/        # FastAPI API, auth, sessions, registrations, check-ins
-├── ml/             # Face embeddings, active liveness, passive liveness
-├── frontend/       # Server-rendered public site
-│   └── public-site/
-├── docs/           # ADRs, legal notes, screenshots, learnings
-├── scripts/        # Dev utilities
-├── tests/          # Cross-component tests
-├── alembic.ini
-├── docker-compose.yml
-├── pyproject.toml
-└── .env.example
+models/
+├── det_10g.onnx
+├── w600k_r50.onnx
+├── MiniFASNetV2.onnx
+└── face_landmarker_v2_with_blendshapes.task
 ```
 
----
+Model artifacts are intentionally not downloaded automatically. Review their
+licenses and provenance before redistributing this project.
 
-## Local Demo
-
-### 1. Configure environment
+## Installation
 
 ```bash
+git clone https://github.com/M1kado0/faceattend.git
+cd faceattend
+uv sync
 cp .env.example .env
 ```
 
-Set real local values for:
+Edit `.env` for your webcam. The current development machine uses camera index
+`1`, but yours may be `0` or another number:
 
-```bash
-POSTGRES_URI=postgresql+asyncpg://user:pass@localhost:5432/faceattend
-ALEMBIC_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/faceattend
-JWT_SECRET=changeme-use-32-plus-random-bytes-in-production
-ML_SERVICE_URL=http://localhost:8003
-BACKEND_API_URL=http://localhost:8002
+```env
+FACEATTEND_CAMERA_INDEX=1
+
+# Optional local overrides
+# FACEATTEND_DATABASE_PATH=./data/faceattend.sqlite3
+# FACEATTEND_MODEL_DIR=./models
 ```
 
-### 2. Start dependencies
+`.env` is ignored by Git. The app loads it automatically at startup.
 
-Use Docker Compose for Postgres/Redis/etc. if needed:
-
-```bash
-docker compose up
-```
-
-If you already run Postgres locally, make sure the `faceattend` database exists.
-
-### 3. Run migrations
+## Run
 
 ```bash
-uv run alembic -c alembic.ini upgrade head
+uv run python -m faceattend
 ```
 
-### 4. Start services
-
-Use three terminals:
+Or, after `uv sync`, use the installed command:
 
 ```bash
-uv run uvicorn ml.serving.api:app --reload --port 8003
+uv run faceattend
 ```
 
-```bash
-uv run uvicorn backend.api.main:app --reload --port 8002
-```
-
-```bash
-uv run uvicorn frontend.public-site.main:app --reload --port 8000
-```
-
-Open:
+The first launch creates the local database at:
 
 ```text
-http://localhost:8000
+data/faceattend.sqlite3
 ```
 
-### 5. Browser flow
+## Demo flow
+
+1. Open the application.
+2. Create an attendance session.
+3. Select **Register**, enter a name, and grant explicit consent.
+4. Follow the active-liveness instructions.
+5. Face the camera and hold still for passive liveness.
+6. Select **Check in**, choose the session, and repeat the liveness sequence.
+7. Try another check-in to observe the duplicate-attendance response.
+
+## Repository layout
 
 ```text
-/register or /login
-/face-registration -> register face with blink and turn countdowns
-/sessions -> create an attendance session
-/check-in -> select session and complete the liveness challenge
-/attendance -> confirm record appears
-/attendance.csv -> confirm export works
+src/faceattend/
+├── application/  # registration and attendance workflow coordination
+├── camera/       # camera ownership and newest-frame buffering
+├── gui/          # PySide6 windows, views, and Qt workers
+├── persistence/  # SQLite schema, records, and repositories
+├── vision/       # detection, quality, liveness, embeddings, matching
+└── evaluation/   # reusable headless evaluation helpers
+
+models/           # local model artifacts; not downloaded automatically
+data/             # local SQLite data; do not commit
 ```
 
-### 6. Failure cases to demo
+## Privacy and security boundaries
 
-- wrong face: check-in is rejected with identity mismatch
-- same face, same session twice: duplicate/idempotent behavior
-- no face: frontend asks user to position face in the oval
-- face too far: frontend asks user to move closer
-- failed blink: backend rejects liveness
+FaceAttend handles biometric data. Use it only with explicit consent and only
+for legitimate, visible, user-initiated check-ins.
 
----
+- Raw camera frames are held in memory for normal enrollment/check-in and are
+  not stored by default.
+- Embeddings, consent records, liveness outcomes, attendance records, model
+  metadata, and audit events are stored locally in SQLite.
+- The local database is sensitive biometric data. Protect the computer and
+  database file, and provide deletion when it is no longer needed.
+- This is an RGB-webcam prototype, **not Apple Face ID** and not a production
+  biometric-security product.
+- Active challenges and MiniFASNetV2 may help with basic presentation attacks,
+  but they do not guarantee resistance to high-quality replays, deepfakes,
+  masks, camera injection, application tampering, or database theft.
+- Recognition and liveness thresholds are provisional project settings, not
+  calibrated production-security guarantees.
 
-## Useful Commands
+## Status
 
-```bash
-uv run pytest
-uv run ruff check .
-uv run ruff format .
-uv run alembic -c alembic.ini upgrade head
-uv run uvicorn ml.serving.api:app --reload --port 8003
-uv run uvicorn backend.api.main:app --reload --port 8002
-uv run uvicorn frontend.public-site.main:app --reload --port 8000
-```
+FaceAttend is a functional portfolio/research prototype. The local desktop
+workflow has been exercised with real webcam enrollment, restart/template
+reload, check-in, and explicit rejection states.
 
----
-
-## Privacy And Safety
-
-FaceAttend handles biometric data. Treat it as sensitive.
-
-- Use only consenting test users.
-- Do not demo with crawled or public celebrity images.
-- Do not store raw face crops in the vector database.
-- Do not record attendance without active and passive liveness.
-- Do not add background tracking or hidden surveillance.
-- Keep audit logging for biometric operations.
-- Get legal review before any real production deployment.
-
----
-
-## Current Status
-
-Implemented:
-
-- account login/register
-- webcam face registration
-- frontend liveness guidance and countdown
-- backend active blink liveness
-- passive liveness on sampled video frames
-- embedding storage in FAISS
-- attendance sessions
-- liveness-gated check-in
-- duplicate check-in handling
-- attendance dashboard
-- CSV export
-
-Not in scope for this MVP:
-
-- admin panel
-- organizer/instructor mode
-- reports page
-- settings page
-- crawler/search/takedown flows
-
----
+It still needs rigorous, consented evaluation before any performance or
+security claims: repeated bona-fide trials, presentation-attack trials,
+threshold calibration, recognition metrics, latency measurements, and an
+independent legal/privacy review before real deployment.
 
 ## License
+
+This repository is currently marked as proprietary. Third-party model and
+library licenses apply independently.
